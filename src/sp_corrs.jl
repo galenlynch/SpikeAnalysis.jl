@@ -182,3 +182,13 @@ function expected_count(u::AbstractVector, binsize, dur)
     nu = length(u)
     expected_count(nu, nu, binsize, dur)
 end
+
+function event_intervals(a::AbstractVector{<:Number})
+    na = length(a)
+    na == 0 && return similar(a, 0)
+    intervals = similar(a, na - 1)
+    @inbounds @simd for i = 1:(na - 1)
+        intervals[i] = a[i + 1] - a[i]
+    end
+    intervals
+end
