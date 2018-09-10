@@ -192,3 +192,21 @@ function event_intervals(a::AbstractVector{<:Number})
     end
     intervals
 end
+
+# Assumes inputs are sorted
+function empirical_qq(a::AbstractVector, b::AbstractVector)
+    na = length(a)
+    nb = length(b)
+    if na == nb
+        return collect(zip(a, b))
+    else
+        # Make inverse empirical distribution
+        if na > nb
+            interp_linear = LinearInterpolation((1:na) / na, a)
+            return [(interp_linear(i / nb), x) for (i, x) in enumerate(b)]
+        else
+            interp_linear = LinearInterpolation((1:nb) / nb, b)
+            return [(x, interp_linear(i / na)) for (i, x) in enumerate(a)]
+        end
+    end
+end
