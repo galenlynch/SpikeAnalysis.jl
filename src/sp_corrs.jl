@@ -1,50 +1,142 @@
 # Inputs must be sorted, should be unique
 function xcorr_discrete_normed(
-    u, v, dur;
+    us::AbstractVector{<:AbstractVector{<:Number}},
+    vs::AbstractVector{<:AbstractVector{<:Number}},
+    durs::AbstractVector{<:Number};
+    binsize = 0.005,
+    maxdiff = nothing,
+    edgecorrect::Bool = true,
+    closed = :left
+)
+    if maxdiff != nothing && maxdiff < binsize
+        error("maxdiff must be bigger than bins")
+    end
+    n_subsection = length(us)
+    if length(vs) != n_subsection || length(durs) != n_subsection
+        throw(ArgumentError("us, vs, and durs must have same length"))
+    end
+    if maxdiff == nothing
+        bextent = maximum(durs)
+    else
+        bextent = maxdiff
+    end
+    edges, centers, n_sidebins = make_sym_bins(bextent, binsize)
+    counts = zeros(Float32, 2 * n_sidebins + 1)
+    auto_u_sum = zero(Float32)
+    auto_v_sum = zero(Float32)
+    for subno = 1:n_subsection
+        diffs = map_pairwise(-, us[subno], vs[subno])
+        flatdiffs = reshape(diffs, length(diffs))
+        h = fit(Histogram, flatdiffs, edges, closed = closed)
+        counts .+= h.weights
+        if edgecorrect
+            center_cnts_symm!(
+                counts,
+                length(us[subno]),
+                length(vs[subno]),
+                binsize,
+                durs[subno],
+                n_sidebins
+            )
+        else
+            center_cnts!(
+                counts, length(us[subno]), length(vs[subno]), binsize, durs[subno]
+            )
+        end
+        auto_u_sum += corrected_auto_counts(
+            us[subno], binsize, durs[subno], edgecorrect, false
+        )
+        auto_v_sum += corrected_auto_counts(
+            vs[subno], binsize, durs[subno], edgecorrect, false
+        )
+    end
+    stdu = abs(auto_u_sum) ^ (1 / 2)
+    stdv = abs(auto_v_sum) ^ (1 / 2)
+    counts ./= (stdu * stdv)
+    counts, centers
+end
+
+function  xcorr_discrete_normed(
+    u::AbstractVector{<:Number}, v::AbstractVector{<:Number}, dur::Number;
+    kwargs...
+)
+    xcorr_discrete_normed([u], [v], [dur]; kwargs...)
+end
+
+function acorr_discrete_normed(
+    us::AbstractVector{<:AbstractVector{<:Number}},
+    durs::AbstractVector{<:Number};
     binsize = 0.005,
     maxdiff = nothing,
     edgecorrect::Bool = true
 )
-    diffs = map_pairwise(-, u, v)
-    stdu = std_autocorr(u, binsize, dur, edgecorrect)
-    stdv = std_autocorr(v, binsize, dur, edgecorrect)
-    if maxdiff != nothing
-        maxdiff > binsize || error("maxdiff must be bigger than bins")
-        ds = filter(x -> abs(x) <= maxdiff, view(diffs, :))
-        bextent = maxdiff - binsize
-    else
-        ds = view(diffs, :)
-        bextent = dur
+    if maxdiff != nothing && maxdiff < binsize
+        error("maxdiff must be bigger than bins")
     end
-    xcnts, centers, _, _, n_sidebins = hist_points_symm(
-        ds, binsize = binsize, bextent = bextent
-    )
-    xc = convert(Vector{Float64}, xcnts)
-    extraargs = edgecorrect ? (n_sidebins) : ()
-    center_cnts!(xc, length(u), length(v), binsize, dur, extraargs...)
-    xc .= xc ./ (stdu * stdv)
-    xc, centers
+    n_subsection = length(us)
+    nus = length.(us)
+    if length(durs) != n_subsection
+        throw(ArgumentError("us and durs must have same length"))
+    end
+    if maxdiff == nothing
+        bextent = maximum(durs)
+    else
+        bextent = maxdiff
+    end
+    edges, centers = make_onesided_bins(bextent, binsize)
+    fitlermax = edges[end]
+    n_bin = length(centers)
+    counts = zeros(Float32, n_bin)
+    for subno = 1:n_subsection
+        diffs = map_pairwise(-, us[subno])
+        h = fit(Histogram, diffs, edges, closed = :left)
+        counts .+= h.weights
+        if edgecorrect
+            center_cnts_onesided!(
+                counts, length(us[subno]), binsize, durs[subno], n_bin
+            )
+        else
+            center_cnts!(counts, length(us[subno]), binsize, durs[subno])
+        end
+    end
+    npt = mapreduce(length, +, us, init = 0)
+    var_u = abs(npt + counts[1])
+    counts ./= var_u
+    counts, centers
+end
+
+function acorr_discrete_normed(
+    u::AbstractVector{<:Number}, dur::Number; kwargs...
+)
+    acorr_discrete_normed([u], [dur]; kwargs...)
 end
 
 function count_auto_first(u, halfbin)
     length(u) + count(x -> x < halfbin, map_pairwise(-, u))
 end
 
-function std_autocorr(u, binsize, dur, edgecorrect::Bool = true)
-    halfbin = binsize / 2
-    basecount = count_auto_first(u, halfbin)
+function corrected_auto_counts(
+    u, binsize, dur, edgecorrect::Bool = true, auto::Bool = true
+)
+    basecount = count_auto_first(u, binsize)
+    count_coeff = ifelse(auto, 1, 2)
     if edgecorrect
-        corrected_cnt = basecount - expected_count(u, binsize, dur)
-    else
         nu = length(u)
-        corrected_cnt = basecount - 2 * expected_count_edge_corrected(
-            halfbin, nu, nu, halfbin, dur
+        corrected_cnt = basecount - count_coeff * expected_count_edge_corrected(
+            binsize, nu, binsize, dur
         )
+    else
+        corrected_cnt = basecount - count_coeff * expected_count(u, binsize, dur)
     end
-    abs(corrected_cnt) ^ (1/2)
+    corrected_cnt
 end
 
-function center_cnts!(cnts, nu, nv, binsize, dur, n_sidebins)
+function center_cnts!(cnts, nu, nv, binsize, dur)
+    cnts .-= expected_count(nu, nv, binsize, dur)
+end
+center_cnts!(cnts, nu, binsize, dur) = center_cnts!(cnts, nu, nu, binsize, dur)
+
+function center_cnts_symm!(cnts, nu, nv, binsize, dur, n_sidebins)
     nc = length(cnts)
     if nc != 2 * n_sidebins + 1
         error("Expected nc to be ", 2 * n_sidebins + 1, " but it is actually ", nc)
@@ -64,15 +156,25 @@ function center_cnts!(cnts, nu, nv, binsize, dur, n_sidebins)
     nothing
 end
 
-function center_cnts!(cnts, nu, nv, binsize, dur)
-    cnts .= cnts .- expected_count(nu, nv, binsize, dur)
+function center_cnts_onesided!(cnts, nu, binsize, dur, n_sidebins)
+    for i = 1:n_sidebins
+        e_cnt = expected_count_edge_corrected(
+            i * binsize, nu, binsize, dur
+        )
+        cnts[i] -= e_cnt
+    end
+    nothing
 end
 
 function expected_count_edge_corrected(binstop, nu, nv, binsize, dur)
     (nu * nv * binsize * (dur - binstop + binsize / 2)) / dur^2
 end
+function expected_count_edge_corrected(binstop, nu, binsize, dur)
+    expected_count_edge_corrected(binstop, nu, nu, binsize, dur)
+end
 
 expected_count(nu::Integer, nv::Integer, binsize, dur) = binsize * nu * nv / dur
+expected_count(nu::Integer, binsize, dur) = expected_count(nu, nu, binsize, dur)
 function expected_count(u::AbstractVector, v::AbstractVector, args...)
     expected_count(length(u), length(v), args...)
 end
