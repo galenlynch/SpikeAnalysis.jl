@@ -3,3 +3,5 @@ StatsBase
 GLUtilities
 Destruct
 Interpolations
+FFTW
+DSP

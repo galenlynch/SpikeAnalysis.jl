@@ -1,4 +1,5 @@
-# Inputs must be sorted, should be unique
+# Inputs must be sorted, must be unique
+# If points are not unique, normalization will be wrong
 function xcorr_discrete_normed(
     us::AbstractVector{<:AbstractVector{<:Number}},
     vs::AbstractVector{<:AbstractVector{<:Number}},
@@ -50,9 +51,7 @@ function xcorr_discrete_normed(
             vs[subno], binsize, durs[subno], edgecorrect, false
         )
     end
-    stdu = abs(auto_u_sum) ^ (1 / 2)
-    stdv = abs(auto_v_sum) ^ (1 / 2)
-    counts ./= (stdu * stdv)
+    counts ./= (auto_y_sum * auto_v_sum) ^ (1 / 2)
     counts, centers
 end
 

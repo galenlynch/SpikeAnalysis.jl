@@ -20,10 +20,66 @@ function hist_density_reps(
     closed::Symbol =  :left,
 )
     nrep = length(pts)
-    max_edge = cld((range_e - range_b),  binsize) * binsize + range_b
+    max_edge = fld((range_e - range_b),  binsize) * binsize + range_b
     edges = range_b:binsize:max_edge
     allpts = cat(pts...; dims = 1)
     h = fit(Histogram, allpts, edges; closed = closed)
     normed_weights = h.weights ./ binsize ./ nrep
-    normed_weights, edges
+    normed_weights, edges, h.weights
+end
+
+function missing_mean(
+    a::AbstractVector{<:AbstractVector{<:Union{Missing, T}}};
+    dims = 1
+) where T
+    na = length(a)
+    na == 0 && throw(ArgumentError("a is empty"))
+    nel = length(a[1])
+    allsame(length, a) || throw(ArgumentError("vectors in a should be same length"))
+    out = Vector{Union{Missing, div_type(T)}}(undef, nel)
+    for elno = 1:nel
+        elsum = 0
+        elcnt = 0
+        for i = 1:na
+            if !ismissing(a[i][elno])
+                elsum += a[i][elno]
+                elcnt += 1
+            end
+            if elcnt > 0
+                out[elno] = elsum / elcnt
+            else
+                out[elno] = missing
+            end
+        end
+    end
+    out
+end
+
+function hist_quantiles_reps(
+    pts::AbstractVector{<:AbstractVector{<:Number}},
+    range_b::Number,
+    range_e::Number;
+    binsize::Number = 0.01,
+    closed::Symbol =  :left,
+    qs = [0.25, 0.5, 0.75],
+    outtype::Type = Float32
+)
+    nrep = length(pts)
+    max_edge = cld((range_e - range_b),  binsize) * binsize + range_b
+    edges = range_b:binsize:max_edge
+    nw = length(edges) - 1
+    nq = length(qs)
+    hs = map(x -> fit(Histogram, x, edges; closed = closed), pts)
+    quants = Vector{Vector{outtype}}(undef, nq)
+    for qno = 1:nq
+        quants[qno] = Vector{outtype}(undef, nw)
+    end
+    for binno = 1:nw
+        frs = map(x -> x.weights[binno] / binsize, hs)
+        q = quantile(frs, qs)
+        for qno = 1:nq
+            quants[qno][binno] = q[qno]
+        end
+    end
+    quants, edges
 end
