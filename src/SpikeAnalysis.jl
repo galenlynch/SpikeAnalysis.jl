@@ -10,7 +10,8 @@ using
     FFTW,
     DSP,
     LinearAlgebra,
-    Statistics
+    Statistics,
+    PointProcesses
 
 export
     xcorr_discrete_normed,
@@ -50,10 +51,12 @@ export
     xcorr_basis,
     xcorr_unwrap!,
     xcorr_unwrap,
-    ifr_warp_remove!,
-    ifr_warp_remove,
-    ifr_remove_mean!,
-    ifr_remove_mean
+    func_warp_remove!,
+    func_warp_remove,
+    func_remove_mean!,
+    func_remove_mean,
+    grow_intervals,
+    add_pres
 
 include("util.jl")
 include("sp_corrs.jl")

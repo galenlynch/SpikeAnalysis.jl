@@ -1,12 +1,8 @@
-
 struct WarpPlan{R, S<:Union{Nothing, Float64}}
     bounds::NTuple{2, R}
     ref::R
     offset::R
     scaling::S
-end
-
-function WarpPlan()
 end
 
 function WarpPlan(
@@ -103,7 +99,7 @@ function piecewise_pt_warp(
     ex_no::Integer = div(length(trigset.trigs), 2)
 ) where A <: AbstractVector{<:Number}
     n_set = length(spkset)
-    ref_intervals = getfield.(trigset.trigs[ex_no].triggered, :interval)
+    ref_intervals = bounds.(getfield.(trigset.trigs[ex_no].triggered, :interval))
     ref_anchors = collect(Iterators.flatten(ref_intervals))
     warped = Vector{div_type(A)}(undef, n_set)
     for i = 1:n_set
@@ -111,7 +107,7 @@ function piecewise_pt_warp(
             spkset[i],
             collect(
                 Iterators.flatten(
-                    getfield.(trigset.trigs[i].triggered, :interval)
+                    bounds.(getfield.(trigset.trigs[i].triggered, :interval))
                 )
             ),
             ref_anchors,
@@ -123,11 +119,14 @@ end
 
 linear_pt_warp(pt, ref, offset, scale) = scale .* (pt .- ref) .+ offset
 linear_pt_warp(pt, ref, offset) = offset .+ pt .- ref
+function linear_pt_warp(pt, plan::WarpPlan{<:Any, Nothing})
+    linear_pt_warp(pt, plan.ref, plan.offset)
+end
+function linear_pt_warp(pt, plan::WarpPlan{<:Any, <:Real})
+    linear_pt_warp(pt, plan.ref, plan.offset, plan.scaling)
+end
 
-linear_pt_warp(pt, plan::WarpPlan{<:Any, Nothing}) = linear_pt_warp(pt, plan.ref, plan.offset)
-linear_pt_warp(pt, plan::WarpPlan{<:Any, <:Real}) = linear_pt_warp(pt, plan.ref, plan.offset, plan.scaling)
-
-function ifr_warp_remove!(
+function func_warp_remove!(
     ifr_out,
     ifr_basis::Union{AbstractVector, AbstractRange},
     interp::AbstractInterpolation,
@@ -143,7 +142,7 @@ function ifr_warp_remove!(
     ifr_out
 end
 
-function ifr_warp_remove!(
+function func_warp_remove!(
     ifr_out,
     ifr_basis::Union{AbstractRange, AbstractVector},
     ref_ifr::AbstractVector{<:Number},
@@ -151,10 +150,10 @@ function ifr_warp_remove!(
     args...
 )
     interp = LinearInterpolation(ref_ifr_basis, ref_ifr)
-    ifr_warp_remove!(ifr_out, ifr_basis, interp, args...)
+    func_warp_remove!(ifr_out, ifr_basis, interp, args...)
 end
 
-ifr_warp_remove(ifr_in, args...) = ifr_warp_remove!(copy(ifr_in), args...)
+func_warp_remove(ifr_in, args...) = func_warp_remove!(copy(ifr_in), args...)
 
 # Warp the original basis onto the template basis, find the interpolated
 # template values, and then subtract the interpolated values from the original
@@ -181,7 +180,7 @@ function warp_ifr_section_remove!(
     ifr_out
 end
 
-function ifr_remove_mean!(
+function func_remove_mean!(
     ifr_out::AbstractVector,
     ifr_basis::Union{AbstractVector, AbstractRange},
     mean_ifr::AbstractVector,
@@ -194,7 +193,7 @@ function ifr_remove_mean!(
     n_int = length(observed_intervals)
     interp = LinearInterpolation(mean_basis, mean_ifr)
     for i = 1:n_int
-        ifr_warp_remove!(
+        func_warp_remove!(
             ifr_out,
             ifr_basis,
             interp,
@@ -207,4 +206,4 @@ function ifr_remove_mean!(
     ifr_out
 end
 
-ifr_remove_mean(ifr_in, args...) = ifr_remove_mean!(copy(ifr_in), args...)
+func_remove_mean(ifr_in, args...) = func_remove_mean!(copy(ifr_in), args...)
