@@ -11,7 +11,9 @@ using
     DSP,
     LinearAlgebra,
     Statistics,
-    PointProcesses
+    PointProcesses,
+    Distributed,
+    SharedArrays
 
 export
     xcorr_discrete_normed,
@@ -56,7 +58,8 @@ export
     func_remove_mean!,
     func_remove_mean,
     grow_intervals,
-    add_pres
+    add_pres,
+    xcorr_sig
 
 include("util.jl")
 include("sp_corrs.jl")

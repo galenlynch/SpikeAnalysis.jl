@@ -121,7 +121,36 @@ function xcorr_basis(nu::Integer, nv::Integer)
     maxlag = max(nu, nv) - 1
     -maxlag:maxlag
 end
+
 function xcorr_basis(nxcorr)
     maxlag = div(nxcorr, 2)
     -maxlag:maxlag
+end
+
+function xcorr_sig(
+    chunks_u::AbstractVector{<:SharedVector},
+    chunks_v::AbstractVector{<:SharedVector},
+    ib,
+    ie,
+    n_trial = 1000
+)
+    nu = length(chunks_u)
+    length(chunks_v) == nu || throw(ArgumentError("Chunks not the same length"))
+    xc = xcorr_normed(chunks_u, chunks_v)
+    max_init = typemin(eltype(xc))
+    max_c = mapreduce(abs, max, view(xc, ib:ie), init = max_init)
+    np = nproc()
+    n_trial_proc = cld(n_trial, np)
+    n_more_extreme = @distributed (+) for i = 1:np
+        local_more_extreme = 0
+        for j = 1:n_trial_proc
+            p = randperm_notsame(nu)
+            shuff_v = chunks_v[p]
+            xc_s = xcorr_normed(chunks_u, shuff_v)
+            max_s = mapreduce(abs, max, view(xc_s, ib:ie), init = max_init)
+            local_more_extreme += max_s >= max_c
+        end
+        local_more_extreme
+    end
+    n_more_extreme / (np * n_trial_proc)
 end
