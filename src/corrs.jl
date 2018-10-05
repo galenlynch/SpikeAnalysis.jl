@@ -27,36 +27,26 @@ function xcorr_normed(
     out
 end
 
-# Different output basis!
-function xcorr_normed(
+function _xcorr_normed!(
+    out::AbstractVector{<:Real},
+    accum::AbstractVector{<:Real},
+    r_buf::AbstractVector{<:Real},
+    uim_buf::AbstractVector{<:Complex},
+    vim_buf::AbstractVector{<:Complex},
     us::AbstractArray{<:AbstractArray{<:Real}},
-    vs::AbstractArray{<:AbstractArray{<:Real}};
-    eltype::Type = Float32,
+    vs::AbstractArray{<:AbstractArray{<:Real}},
+    nu::Integer,
+    u_ls::AbstractVector{<:Integer},
+    v_ls::AbstractVector{<:Integer},
+    p,
+    ip,
+    n_padded::Integer,
+    nlag::Integer,
     center::Bool = true
 )
-    nu = length(us)
-    nu == length(vs) || throw(ArgumentError("us and vs not the same length"))
-    u_ls = length.(us)
-    u_max_l = maximum(u_ls)
-    v_ls = length.(vs)
-    v_max_l = maximum(v_ls)
-    nlag = max(u_max_l, v_max_l) - 1
-    n = 2 * nlag + 1
 
-    n_padded = nextfastfft(n)
-    n_comp = div(n_padded, 2) + 1
-
-    r_buf = Vector{eltype}(undef, n_padded)
-    uim_buf = Vector{Complex{eltype}}(undef, n_comp)
-    vim_buf = similar(uim_buf)
-    accum = zeros(eltype, n_padded)
-    out = Vector{eltype}(undef, n)
-
-    p = plan_rfft(r_buf)
-    ip = plan_irfft(uim_buf, n_padded)
-
-    out_norm = zero(eltype)
-
+    accum .= 0
+    out_norm = zero(eltype(out))
     for vecno = 1:nu
         out_norm += _xcorr!(
             accum,
@@ -74,8 +64,77 @@ function xcorr_normed(
     end
     
     xcorr_unwrap!(out, accum, nlag, n_padded)
-    out ./= out_norm
+    out ./= out_norm * n_padded
     out
+end
+
+function prepare_xcorr(
+    us::AbstractArray{<:AbstractArray{<:Real}},
+    vs::AbstractArray{<:AbstractArray{<:Real}},
+    outtype::Type = Float32,
+)
+    nu = length(us)
+    nu == length(vs) || throw(ArgumentError("us and vs not the same length"))
+    u_ls = length.(us)
+    u_max_l = maximum(u_ls)
+    v_ls = length.(vs)
+    v_max_l = maximum(v_ls)
+    nlag = max(u_max_l, v_max_l) - 1
+    n = 2 * nlag + 1
+
+    n_padded = nextfastfft(n)
+    n_comp = div(n_padded, 2) + 1
+
+    r_buf = Vector{outtype}(undef, n_padded)
+    accum = similar(r_buf)
+    uim_buf = Vector{Complex{outtype}}(undef, n_comp)
+    vim_buf = similar(uim_buf)
+    out = Vector{outtype}(undef, n)
+
+    p = plan_rfft(r_buf)
+    ip = plan_brfft(uim_buf, n_padded)
+
+    return (
+        out,
+        accum,
+        r_buf,
+        uim_buf,
+        vim_buf,
+        nu,
+        u_ls,
+        v_ls,
+        p,
+        ip,
+        n_padded,
+        nlag
+    )
+end
+
+function xcorr_normed(
+    us::AbstractArray{<:AbstractArray{<:Real}},
+    vs::AbstractArray{<:AbstractArray{<:Real}};
+    outtype::Type = Float32,
+    center::Bool = true
+)
+    out, accum, r_buf, uim_buf, vim_buf, nu, u_ls, v_ls, p, ip, n_padded, nlag =
+        prepare_xcorr(us, vs, outtype)
+    _xcorr_normed!(
+        out,
+        accum,
+        r_buf,
+        uim_buf,
+        vim_buf,
+        us,
+        vs,
+        nu,
+        u_ls,
+        v_ls,
+        p,
+        ip,
+        n_padded,
+        nlag,
+        center
+    )
 end
 
 # Mutates r_buf and im_buf
@@ -132,22 +191,43 @@ function xcorr_sig(
     chunks_v::AbstractVector{<:SharedVector},
     ib,
     ie,
-    n_trial = 1000
+    n_trial = 1000,
+    center::Bool = false
 )
     nu = length(chunks_u)
     length(chunks_v) == nu || throw(ArgumentError("Chunks not the same length"))
-    xc = xcorr_normed(chunks_u, chunks_v)
+
+    xc = xcorr_normed(chunks_u, chunks_v, center = false)
     max_init = typemin(eltype(xc))
     max_c = mapreduce(abs, max, view(xc, ib:ie), init = max_init)
-    np = nproc()
+    np = nprocs()
     n_trial_proc = cld(n_trial, np)
     n_more_extreme = @distributed (+) for i = 1:np
         local_more_extreme = 0
+        out, accum, r_buf, uim_buf, vim_buf, nu, u_ls, v_ls, pl, ipl, n_padded, nlag =
+            prepare_xcorr(chunks_u, chunks_v)
         for j = 1:n_trial_proc
             p = randperm_notsame(nu)
-            shuff_v = chunks_v[p]
-            xc_s = xcorr_normed(chunks_u, shuff_v)
-            max_s = mapreduce(abs, max, view(xc_s, ib:ie), init = max_init)
+            shuff_vs = chunks_v[p]
+            shuff_v_ls = v_ls[p]
+            _xcorr_normed!(
+                out,
+                accum,
+                r_buf,
+                uim_buf,
+                vim_buf,
+                chunks_u,
+                shuff_vs,
+                nu,
+                u_ls,
+                shuff_v_ls,
+                pl,
+                ipl,
+                n_padded,
+                nlag,
+                center
+            )
+            max_s = mapreduce(abs, max, view(out, ib:ie), init = max_init)
             local_more_extreme += max_s >= max_c
         end
         local_more_extreme
