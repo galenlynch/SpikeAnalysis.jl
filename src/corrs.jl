@@ -27,9 +27,6 @@ function xcorr_normed(
     out
 end
 
-function unwrap_xcorr!
-end
-
 # Different output basis!
 function xcorr_normed(
     us::AbstractArray{<:AbstractArray{<:Real}},
