@@ -118,15 +118,17 @@ function find_motifs(
     return motif_i[p], motif_ons[p], motif_offs[p], motif_durs[p]
 end
 
-function call_bouts(ints_syl, mic_rec_dur, max_gap = 3)
-    bout_intervals = join_intervals(ints_syl, max_gap)
-    silence_intervals = interval_compliments(
-        0, mic_rec_dur, bout_intervals, max_gap
-    )
-
-    bout_durs = map(x -> x[2] - x[1], bout_intervals)
-    silence_durs = map(x -> x[2] - x[1], silence_intervals)
-    return bout_intervals, silence_intervals, bout_durs, silence_durs
+function call_bouts(
+    rec_int,
+    ints_syll,
+    seed_marks,
+    join_marks,
+    max_dist,
+    contraction = max_dist
+)
+    bouts = grow_intervals(rec_int, ints_syll, seed_marks, join_marks, max_dist)
+    silence_intervals = shrink(complement(rec_int, bouts), contraction)
+    return bouts, silence_intervals
 end
 
 function trig_data(
