@@ -295,13 +295,13 @@ end
 
 # join sets of marked intervals, defined on super-interval dom, if intervals are
 # closer than some distance max_dist, and at least one of the intervals returns
-# true for seed_mark_pred, only including intervals which are true for either
-# seed_mark_pred or join_mark_pred
+# true for seed_marks, only including intervals which are true for either
+# seed_marks or join_marks
 function grow_intervals(
     dom::D,
     ints::AbstractVector{<:MarkedInterval},
-    seed_mark_pred::Function,
-    join_mark_pred::Function,
+    seed_marks::AbstractVector,
+    join_marks::AbstractVector,
     max_dist::Real
 ) where {E, D<:NakedInterval{E}}
     nint = length(ints)
@@ -309,27 +309,27 @@ function grow_intervals(
         return Vector{D}()
     end
     ints_merged = Vector{D}(undef, nint)
-    full_join_pred = m -> join_mark_pred(m) | seed_mark_pred(m)
+    all_marks = vcat(seed_marks, join_marks)
 
     intno = 0
     elig_idx = 1
     joined_start = bounds(ints[1])[1]
     last_end = bounds(ints[1])[2]
-    growing = seed_mark_pred(get_mark(ints[1]))
+    growing = anyeq(get_mark(ints[1]), seed_marks)
     for i in 2:nint
         this_mark = get_mark(ints[i])
         b, e = bounds(ints[i])
         this_int = b - last_end
 
         if growing
-            growing = (this_int <= max_dist) & full_join_pred(this_mark)
+            growing = (this_int <= max_dist) & anyeq(this_mark, all_marks)
             if ! growing # end of growing section
                 elig_index = i + 1
                 intno += 1
                 ints_merged[intno] = NakedInterval(joined_start, last_end)
             end
 
-        elseif seed_mark_pred(this_mark)
+        elseif anyeq(this_mark, seed_marks)
             # start interval
             growing = true
 
@@ -339,7 +339,7 @@ function grow_intervals(
             last_b = b
             while (
                 back_i >= elig_idx &&
-                full_join_pred(get_mark(ints[back_i])) &&
+                anyeq(get_mark(ints[back_i]), all_marks) &&
                 last_b - bounds(ints[back_i])[2] <= max_dist
             )
                 last_b = bounds(ints[back_i])[1]
