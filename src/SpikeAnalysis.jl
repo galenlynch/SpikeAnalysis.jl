@@ -59,7 +59,8 @@ export
     func_remove_mean,
     grow_intervals,
     add_pres,
-    xcorr_sig
+    xcorr_sig,
+    xcorr_null_mc
 
 include("util.jl")
 include("sp_corrs.jl")

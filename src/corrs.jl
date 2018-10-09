@@ -62,7 +62,7 @@ function _xcorr_normed!(
             center
         )
     end
-    
+
     xcorr_unwrap!(out, accum, nlag, n_padded)
     out ./= out_norm * n_padded
     out
@@ -187,50 +187,97 @@ function xcorr_basis(nxcorr)
 end
 
 function xcorr_sig(
+    ib::Integer,
+    ie::Integer,
+    xc::AbstractVector{<:Number},
+    xc_nulls::AbstractVector{<:Number},
+    ntrial = length(null_xcs)
+)
+    xc_extr_idx = argmax(abs.(view(xc, ib:ie)))
+    xc_extr = xc[ndx_offset(ib, xc_extr_idx)]
+    mc_twotail_asymm_p(xc_extr, xc_nulls, ntrial)
+end
+
+function xcorr_sig(
     chunks_u::AbstractVector{<:SharedVector},
     chunks_v::AbstractVector{<:SharedVector},
+    xcs_null::AbstractVector{<:Number},
+    ib::Integer,
+    ie::Integer,
+    n_trial = length(xcs_null),
+    center::Bool = false
+)
+    xc = xcorr_normed(chunks_u, chunks_v, center = center)
+    xcorr_sig(ib, ie, xc, xcs_null, n_trial)
+end
+
+function xcorr_sig(
+    chunks_u::AbstractVector{<:SharedVector},
+    chunks_v::AbstractVector{<:SharedVector},
+    ib::Integer,
+    ie::Integer,
+    n_trial = 1000,
+    center::Bool = false
+)
+    xcs_null = xcorr_null_mc(chunks_u, chunks_v, ib, ie, n_trial, center)
+    xcorr_sig(chunks_u, chunks_v, xcs_null, ib, ie, n_trial, center)
+end
+
+function xcorr_null_mc(
+    chunks_u::AbstractVector{<:SharedVector{E}},
+    chunks_v::AbstractVector{<:SharedVector{F}},
     ib,
     ie,
     n_trial = 1000,
     center::Bool = false
-)
+) where {E, F}
+    outtype = promote_type(E, F)
     nu = length(chunks_u)
     length(chunks_v) == nu || throw(ArgumentError("Chunks not the same length"))
+    extr_out = Vector{outtype}(undef, n_trial)
+    (
+        xc_out,
+        accum,
+        r_buf,
+        uim_buf,
+        vim_buf,
+        nu,
+        u_ls,
+        v_ls,
+        pl,
+        ipl,
+        n_padded,
+        nlag
+    ) = prepare_xcorr(chunks_u, chunks_v)
 
-    xc = xcorr_normed(chunks_u, chunks_v, center = false)
-    max_init = typemin(eltype(xc))
-    max_c = mapreduce(abs, max, view(xc, ib:ie), init = max_init)
-    np = nprocs()
-    n_trial_proc = cld(n_trial, np)
-    n_more_extreme = @distributed (+) for i = 1:np
-        local_more_extreme = 0
-        out, accum, r_buf, uim_buf, vim_buf, nu, u_ls, v_ls, pl, ipl, n_padded, nlag =
-            prepare_xcorr(chunks_u, chunks_v)
-        for j = 1:n_trial_proc
-            p = randperm_notsame(nu)
-            shuff_vs = chunks_v[p]
-            shuff_v_ls = v_ls[p]
-            _xcorr_normed!(
-                out,
-                accum,
-                r_buf,
-                uim_buf,
-                vim_buf,
-                chunks_u,
-                shuff_vs,
-                nu,
-                u_ls,
-                shuff_v_ls,
-                pl,
-                ipl,
-                n_padded,
-                nlag,
-                center
-            )
-            max_s = mapreduce(abs, max, view(out, ib:ie), init = max_init)
-            local_more_extreme += max_s >= max_c
+    for i = 1:n_trial
+        p = randperm_notsame(nu)
+        shuff_vs = chunks_v[p]
+        shuff_v_ls = v_ls[p]
+        _xcorr_normed!(
+            xc_out,
+            accum,
+            r_buf,
+            uim_buf,
+            vim_buf,
+            chunks_u,
+            shuff_vs,
+            nu,
+            u_ls,
+            shuff_v_ls,
+            pl,
+            ipl,
+            n_padded,
+            nlag,
+            center
+        )
+        xc_max = typemin(eltype(xc_out))
+        xc_min = typemax(eltype(xc_out))
+        for j = ib:ie
+            xc_max = max(xc_max, xc_out[j])
+            xc_min = min(xc_min, xc_out[j])
         end
-        local_more_extreme
+        extr_out[i] = ifelse(abs(xc_max) > abs(xc_min), xc_max, xc_min)
     end
-    n_more_extreme / (np * n_trial_proc)
+    extr_out
 end
