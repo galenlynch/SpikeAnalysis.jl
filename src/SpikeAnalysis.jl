@@ -49,18 +49,18 @@ export
     missing_mean,
     piecewise_pt_warp!,
     piecewise_pt_warp,
-    xcorr_normed,
+    circ_xcorr_normed,
     xcorr_basis,
-    xcorr_unwrap!,
-    xcorr_unwrap,
+    circ_xcorr_unwrap!,
+    circ_xcorr_unwrap,
     func_warp_remove!,
     func_warp_remove,
     func_remove_mean!,
     func_remove_mean,
     grow_intervals,
     add_pres,
-    xcorr_sig,
-    xcorr_null_mc
+    circ_xcorr_sig,
+    circ_xcorr_null_mc
 
 include("util.jl")
 include("sp_corrs.jl")

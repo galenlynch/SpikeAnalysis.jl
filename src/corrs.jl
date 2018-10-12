@@ -1,4 +1,4 @@
-function xcorr_normed(
+function circ_xcorr_normed(
     u::AbstractArray{<:AbstractFloat},
     v::AbstractArray{<:AbstractFloat};
     eltype::Type = Float32,
@@ -22,7 +22,7 @@ function xcorr_normed(
     out_norm = _xcorr!(
         accum, u, nu, v, nv, r_buf, uim_buf, vim_buf, p, ip, center
     )
-    xcorr_unwrap!(out, accum, nlag, n_padded)
+    circ_xcorr_unwrap!(out, accum, nlag, n_padded)
     out ./= out_norm
     out
 end
@@ -63,12 +63,12 @@ function _xcorr_normed!(
         )
     end
 
-    xcorr_unwrap!(out, accum, nlag, n_padded)
+    circ_xcorr_unwrap!(out, accum, nlag, n_padded)
     out ./= out_norm * n_padded
     out
 end
 
-function prepare_xcorr(
+function prepare_circ_xcorr(
     us::AbstractArray{<:AbstractArray{<:Real}},
     vs::AbstractArray{<:AbstractArray{<:Real}},
     outtype::Type = Float32,
@@ -110,14 +110,14 @@ function prepare_xcorr(
     )
 end
 
-function xcorr_normed(
+function circ_xcorr_normed(
     us::AbstractArray{<:AbstractArray{<:Real}},
     vs::AbstractArray{<:AbstractArray{<:Real}};
     outtype::Type = Float32,
     center::Bool = true
 )
     out, accum, r_buf, uim_buf, vim_buf, nu, u_ls, v_ls, p, ip, n_padded, nlag =
-        prepare_xcorr(us, vs, outtype)
+        prepare_circ_xcorr(us, vs, outtype)
     _xcorr_normed!(
         out,
         accum,
@@ -170,7 +170,7 @@ function _xcorr!(
     sqrt(unorm * vnorm)
 end
 
-function xcorr_unwrap!(out, accum, nlag, n_padded)
+function circ_xcorr_unwrap!(out, accum, nlag, n_padded)
     copyto!(out, nlag + 1, accum, 1, nlag + 1)
     copyto!(out, 1, accum, ndx_offset(n_padded, -nlag), nlag)
     out
@@ -186,7 +186,7 @@ function xcorr_basis(nxcorr)
     -maxlag:maxlag
 end
 
-function xcorr_sig(
+function circ_xcorr_sig(
     ib::Integer,
     ie::Integer,
     xc::AbstractVector{<:Number},
@@ -198,7 +198,7 @@ function xcorr_sig(
     mc_twotail_asymm_p(xc_extr, xc_nulls, ntrial)
 end
 
-function xcorr_sig(
+function circ_xcorr_sig(
     chunks_u::AbstractVector{<:SharedVector},
     chunks_v::AbstractVector{<:SharedVector},
     xcs_null::AbstractVector{<:Number},
@@ -207,11 +207,11 @@ function xcorr_sig(
     n_trial = length(xcs_null),
     center::Bool = false
 )
-    xc = xcorr_normed(chunks_u, chunks_v, center = center)
-    xcorr_sig(ib, ie, xc, xcs_null, n_trial)
+    xc = circ_xcorr_normed(chunks_u, chunks_v, center = center)
+    circ_xcorr_sig(ib, ie, xc, xcs_null, n_trial)
 end
 
-function xcorr_sig(
+function circ_xcorr_sig(
     chunks_u::AbstractVector{<:SharedVector},
     chunks_v::AbstractVector{<:SharedVector},
     ib::Integer,
@@ -219,11 +219,11 @@ function xcorr_sig(
     n_trial = 1000,
     center::Bool = false
 )
-    xcs_null = xcorr_null_mc(chunks_u, chunks_v, ib, ie, n_trial, center)
-    xcorr_sig(chunks_u, chunks_v, xcs_null, ib, ie, n_trial, center)
+    xcs_null = circ_xcorr_null_mc(chunks_u, chunks_v, ib, ie, n_trial, center)
+    circ_xcorr_sig(chunks_u, chunks_v, xcs_null, ib, ie, n_trial, center)
 end
 
-function xcorr_null_mc(
+function circ_xcorr_null_mc(
     chunks_u::AbstractVector{<:SharedVector{E}},
     chunks_v::AbstractVector{<:SharedVector{F}},
     ib,
@@ -248,7 +248,7 @@ function xcorr_null_mc(
         ipl,
         n_padded,
         nlag
-    ) = prepare_xcorr(chunks_u, chunks_v)
+    ) = prepare_circ_xcorr(chunks_u, chunks_v)
 
     for i = 1:n_trial
         p = randperm_notsame(nu)
