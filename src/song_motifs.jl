@@ -1,3 +1,10 @@
+"""
+    RasterTrigSylls{D, M<:MarkedInterval{D, <:Any}}
+
+Represents a "trigger", which is a sequence of syllables in a longer sequence
+that matches some pattern. This is akin to the trigger of an oscilloscope, or
+electro_gui.
+"""
 struct RasterTrigSylls{D, M<:MarkedInterval{D, <:Any}}
     triggered::Vector{M}
     other::Vector{M}
@@ -5,6 +12,13 @@ struct RasterTrigSylls{D, M<:MarkedInterval{D, <:Any}}
     expanded_interval::NTuple{2, D}
 end
 
+"""
+    TrigSet{D, R<:RasterTrigSylls{D, <:Any}
+
+Represents a group of triggers, with some time around each trigger.
+
+See Also: [`RasterTrigSylls`](@ref)
+"""
 struct TrigSet{D, R<:RasterTrigSylls{D, <:Any}}
     trigs::Vector{R}
     trig_durs::Vector{D}
@@ -118,6 +132,9 @@ function find_motifs(
     return motif_i[p], motif_ons[p], motif_offs[p], motif_durs[p]
 end
 
+"""
+Finds bouts of song
+"""
 function call_bouts(
     rec_int,
     ints_syll,
@@ -131,6 +148,21 @@ function call_bouts(
     return bouts, silence_intervals
 end
 
+"""
+    trig_data(
+        trig_seq::AbstractVector{<:AbstractString},
+        labels_syl::AbstractVector{<:AbstractString},
+        offs_syl::AbstractVector{<:Real},
+        durs_syl::AbstractVector{<:Real},
+        syls::AbstractVector{<:MarkedInterval},
+        pre::Real,
+        post_expand::Union{Real, Nothing} = nothing;
+        post::Union{Nothing, Real} = nothing
+    )
+
+Finds occurrences of the sub-sequence specified by `trig_seq` in the sequence
+`labels_syl`. Returns a [`TrigSet`](@ref).
+"""
 function trig_data(
     trig_seq::AbstractVector{<:AbstractString},
     labels_syl::AbstractVector{<:AbstractString},
@@ -182,6 +214,15 @@ end
 function motif_events(event_set::AbstractVector, trig::RasterTrigSylls)
     mask_events(event_set, trig.expanded_interval...)
 end
+
+"""
+    align_trigs(raw::TrigSet)
+
+Takes a `TrigSet`, and aligns each `RasterTrigSylls` therein to the onset time
+of its first triggered syllable.
+
+See also: [`align_trigs(::RasterTrigSylls)`](@ref)
+"""
 function align_trigs(raw::TrigSet)
     aligned_trigs = similar(raw.trigs)
     for (i, t) in enumerate(raw.trigs)
@@ -196,6 +237,14 @@ function align_trigs(raw::TrigSet)
     )
 end
 
+"""
+    align_trigs(raw::RasterTrigSylls)
+
+Takes a `RasterTrigSylls`, and aligns its syllable times to the onset of the
+first triggered syllable. Returns a new, aligned, `RasterTrigSylls`.
+
+See also: [`align_trigs(::TrigSet)`](@ref)
+"""
 function align_trigs(raw::RasterTrigSylls)
     onset = bounds(raw.triggered[1].interval)[1]
     RasterTrigSylls(
@@ -217,6 +266,11 @@ function align_intervals(raw::AbstractVector{<:MarkedInterval}, onset)
     aligned
 end
 
+"""
+    clip_trigs(raw::TrigSet)
+
+Clips syllables in a TrigSet to its expanded interval.
+"""
 function clip_trigs(raw::TrigSet)
     clipped_trigs = similar(raw.trigs)
     for (i, t) in enumerate(raw.trigs)
