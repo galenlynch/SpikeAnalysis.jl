@@ -178,7 +178,7 @@ function trig_data(
         trig_seq, labels_syl, offs_syl, durs_syl, trig_len
     )
 
-    median_motif_dur = median(motif_durs)
+    median_motif_dur = isempty(motif_durs) ? NaN : median(motif_durs)
     if post == nothing
         post_expand == nothing && error("post or post_expand must be specified")
         post = median_motif_dur + post_expand
