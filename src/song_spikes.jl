@@ -1,3 +1,8 @@
+"""
+    WarpPlan{R, S<:Union{Nothing, Float64}}
+
+Type for storing a piece of a piece-wise linear transform (warping) of points.
+"""
 struct WarpPlan{R, S<:Union{Nothing, Float64}}
     bounds::NTuple{2, R}
     ref::R
