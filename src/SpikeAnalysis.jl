@@ -20,7 +20,6 @@ export
     acorr_discrete_normed,
     event_intervals,
     empirical_qq,
-    MarkedInterval,
     raster_syll_data,
     motif_events,
     motif_info,
