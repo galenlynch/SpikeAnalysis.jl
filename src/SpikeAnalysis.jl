@@ -59,7 +59,11 @@ export
     grow_intervals,
     add_pres,
     circ_xcorr_sig,
-    circ_xcorr_null_mc
+    circ_xcorr_null_mc,
+    sound_loudness,
+    song_rhythm_power_ratio,
+    guess_if_array_contains_song,
+    score_array_for_song
 
 include("util.jl")
 include("sp_corrs.jl")

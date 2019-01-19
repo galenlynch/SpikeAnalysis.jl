@@ -411,3 +411,117 @@ function grow_intervals(
     resize!(ints_merged, intno)
     ints_merged
 end
+
+sound_loudness(s) = 10 * log10.(s .^ 2 .+ eps())
+sound_loudness(s, b) = sound_loudness(filtfilt(b, s))
+function sound_loudness(s, fs, band_start, band_stop, order)
+    b = make_bandpass(fs, band_start, band_stop, order)
+    sound_loudness(s, b)
+end
+
+function song_rhythm_power_ratio(
+    l::AbstractArray,
+    sr::Number,
+    song_window = (5, 12),
+    n = sr,
+    n_ov = round(Int, 0.75 * n)
+)
+    s = spectrogram(l .- mean(l), n, n_ov, fs = sr, window = blackman(n))
+    songmask = song_window[1] .<= s.freq .<= song_window[2]
+    song_pow = sum(s.power[songmask, :], dims = 1)
+    maximum(song_pow)
+end
+
+function song_rhythm_power_ratio(b::AbstractArray, s::AbstractArray, args...)
+    l = sound_loudness(s, b)
+    song_rhythm_power_ratio(l, args...)
+end
+
+@enum SongGuess not_song maybe_song probably_song
+
+function guess_if_score_is_song(
+    mean_i,
+    rhythm_pow;
+    disc_slope = -5.075132275132278,
+    disc_offset = -234.00380952380965,
+    confident_thresh = 13.6,
+    disc_thresh = 0
+)
+    disc_proj = distance_from_discriminant(
+        mean_i, rhythm_pow, disc_slope, disc_offset
+    )
+    ifelse(
+        disc_proj <= disc_thresh,
+        not_song,
+        ifelse(
+            disc_proj >= confident_thresh,
+            probably_song,
+            maybe_song
+        )
+    )
+end
+
+function distance_from_discriminant(
+    mean_i,
+    rhythm_pow,
+    disc_slope = -5.075132275132278,
+    disc_offset = -234.00380952380965
+)
+    - (disc_slope * mean_i - rhythm_pow + disc_offset) /
+        sqrt(disc_slope ^ 2 + 1)
+end
+
+function score_array_for_song(
+    l::AbstractArray,
+    sr::Number;
+    song_window = (5, 12),
+    n = sr,
+    n_ov = round(Int, 0.75 * n)
+)
+    nav = round(Int, sr / 2)
+    rhythm_pow = song_rhythm_power_ratio(l, sr, song_window, n, n_ov)
+    mean_i = maximum(moving_sum(l, nav)) / nav
+    mean_i, rhythm_pow
+end
+
+function score_array_for_song(
+    b::AbstractArray, s::AbstractArray, args...; kwargs...
+)
+    score_array_for_song(sound_loudness(s, b), args...; kwargs...)
+end
+
+function song_discriminant(
+    l::AbstractArray,
+    sr::Number;
+    song_window = (5, 12),
+    n = sr,
+    n_ov = round(Int, 0.75 * n),
+    disc_slope = -5.075132275132278,
+    disc_offset = -234.00380952380965
+)
+    intensity, rhythm = score_array_for_song(
+        l, sr, song_window = song_window, n = n, n_ov = n_ov
+    )
+    distance_from_discriminant(intensity, rhythm, disc_slope, disc_offset)
+end
+
+function song_discriminant(
+    b::AbstractArray, s::AbstractArray, args...; kwargs...
+)
+    song_discriminant(sound_loudness(s, b), args...; kwargs...)
+end
+
+function guess_if_array_contains_song(
+    b::AbstractArray,
+    s::AbstractArray,
+    sr::Number;
+    song_window = (5, 12),
+    n = sr,
+    n_ov = round(Int, 0.75 * n),
+    kwargs...
+)
+    mean_i, rhythm_pow = score_array_for_song(
+        b, s, sr, song_window = song_window, n = n, n_ov = n_ov
+    )
+    guess_if_score_is_song(mean_i, rhythm_pow; kwargs...)
+end
