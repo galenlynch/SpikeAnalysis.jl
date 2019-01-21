@@ -419,7 +419,7 @@ function sound_loudness(s, fs, band_start, band_stop, order)
     sound_loudness(s, b)
 end
 
-function song_rhythm_power_ratio(
+function song_rhythm_power(
     l::AbstractArray,
     sr::Number,
     song_window = (5, 12),
@@ -432,24 +432,20 @@ function song_rhythm_power_ratio(
     maximum(song_pow)
 end
 
-function song_rhythm_power_ratio(b::AbstractArray, s::AbstractArray, args...)
+function song_rhythm_power(b::AbstractArray, s::AbstractArray, args...)
     l = sound_loudness(s, b)
-    song_rhythm_power_ratio(l, args...)
+    song_rhythm_power(l, args...)
 end
 
 @enum SongGuess not_song maybe_song probably_song
 
 function guess_if_score_is_song(
-    mean_i,
-    rhythm_pow;
+    disc_proj;
     disc_slope = -5.075132275132278,
     disc_offset = -234.00380952380965,
     confident_thresh = 13.6,
     disc_thresh = 0
 )
-    disc_proj = distance_from_discriminant(
-        mean_i, rhythm_pow, disc_slope, disc_offset
-    )
     ifelse(
         disc_proj <= disc_thresh,
         not_song,
@@ -461,6 +457,29 @@ function guess_if_score_is_song(
     )
 end
 
+function score_array_for_song(
+    l::AbstractArray,
+    sr::Number;
+    song_window = (5, 12),
+    n = sr,
+    n_ov = round(Int, 0.75 * n),
+    n_av = convert(Int, div(sr, 2))
+)
+    nl = length(l)
+    adj_n = min(n, nl)
+    adj_n_ov = min(n_ov, round(Int, 0.75 * adj_n))
+    adj_n_av = min(n_av, nl)
+    rhythm_pow = song_rhythm_power(l, sr, song_window, n, n_ov)
+    mean_i = maximum(moving_sum(l, adj_n_av)) / adj_n_av
+    mean_i, rhythm_pow
+end
+
+function score_array_for_song(
+    b::AbstractArray, s::AbstractArray, args...; kwargs...
+)
+    score_array_for_song(sound_loudness(s, b), args...; kwargs...)
+end
+
 function distance_from_discriminant(
     mean_i,
     rhythm_pow,
@@ -469,25 +488,6 @@ function distance_from_discriminant(
 )
     - (disc_slope * mean_i - rhythm_pow + disc_offset) /
         sqrt(disc_slope ^ 2 + 1)
-end
-
-function score_array_for_song(
-    l::AbstractArray,
-    sr::Number;
-    song_window = (5, 12),
-    n = sr,
-    n_ov = round(Int, 0.75 * n)
-)
-    nav = round(Int, sr / 2)
-    rhythm_pow = song_rhythm_power_ratio(l, sr, song_window, n, n_ov)
-    mean_i = maximum(moving_sum(l, nav)) / nav
-    mean_i, rhythm_pow
-end
-
-function score_array_for_song(
-    b::AbstractArray, s::AbstractArray, args...; kwargs...
-)
-    score_array_for_song(sound_loudness(s, b), args...; kwargs...)
 end
 
 function song_discriminant(
@@ -506,22 +506,28 @@ function song_discriminant(
 end
 
 function song_discriminant(
-    b::AbstractArray, s::AbstractArray, args...; kwargs...
+    b::AbstractArray, s::AbstractArray, args...;
+    kwargs...
 )
     song_discriminant(sound_loudness(s, b), args...; kwargs...)
 end
 
 function guess_if_array_contains_song(
-    b::AbstractArray,
-    s::AbstractArray,
+    l::AbstractArray,
     sr::Number;
     song_window = (5, 12),
     n = sr,
     n_ov = round(Int, 0.75 * n),
     kwargs...
 )
-    mean_i, rhythm_pow = score_array_for_song(
-        b, s, sr, song_window = song_window, n = n, n_ov = n_ov
+    disc_proj = song_discriminant(
+        l, sr, song_window = song_window, n = n, n_ov = n_ov
     )
     guess_if_score_is_song(mean_i, rhythm_pow; kwargs...)
+end
+
+function guess_if_array_contains_song(
+    b::AbstractArray, s::AbstractArray, args...; kwargs...
+)
+    guess_if_array_contains_song(sound_loudness(s, b), args...; kwargs...)
 end

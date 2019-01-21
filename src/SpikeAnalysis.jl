@@ -18,6 +18,7 @@ using
 export
     xcorr_discrete_normed,
     acorr_discrete_normed,
+    distance_from_discriminant,
     event_intervals,
     empirical_qq,
     raster_syll_data,
@@ -61,9 +62,12 @@ export
     circ_xcorr_sig,
     circ_xcorr_null_mc,
     sound_loudness,
-    song_rhythm_power_ratio,
+    song_discriminant,
+    song_rhythm_power,
     guess_if_array_contains_song,
-    score_array_for_song
+    guess_if_score_is_song,
+    score_array_for_song,
+    SongGuess
 
 include("util.jl")
 include("sp_corrs.jl")
