@@ -121,7 +121,7 @@ function corrected_auto_counts(
     count_coeff = ifelse(auto, 1, 2)
     if edgecorrect
         nu = length(u)
-        corrected_cnt = basecount - count_coeff * expected_count_edge_corrected(
+        corrected_cnt = basecount - count_coeff * t_count_edge_corrected(
             binsize, nu, binsize, dur
         )
     else
@@ -208,4 +208,92 @@ function empirical_qq(a::AbstractVector, b::AbstractVector)
             return [(x, interp_linear(i / na)) for (i, x) in enumerate(a)]
         end
     end
+end
+
+function xcorr_discrete_validonly(
+    us::AbstractVector{<:AbstractVector},
+    vs::AbstractVector{<:AbstractVector},
+    durs::AbstractVector{<:Number},
+    maxdiff::Number;
+    binsize = 0.005,
+    closed = :left,
+    normalize = true
+)
+    n_subsection = length(us)
+    if length(vs) != n_subsection || length(durs) != n_subsection
+        throw(ArgumentError("us, vs, and durs must have same length"))
+    end
+    if maxdiff < binsize
+        error("maxdiff must be bigger than bins")
+    end
+    if any(2 * maxdiff .> durs)
+        error("2 * maxdiff must be smaller than all durs")
+    end
+    edges, centers, n_sidebins = make_sym_bins(maxdiff, binsize)
+    counts = zeros(Float32, 2 * n_sidebins + 1)
+    auto_u_sum = zero(Float32)
+    auto_v_sum = zero(Float32)
+    ntotal = 0
+    for subno = 1:n_subsection
+        nu = length(us[subno])
+        nv = length(vs[subno])
+
+        ib_u = searchsortedfirst(us[subno], maxdiff)
+        ib_v = searchsortedfirst(vs[subno], maxdiff)
+
+        ie_u = searchsortedlast(us[subno], durs[subno] - maxdiff)
+        ie_v = searchsortedlast(vs[subno], durs[subno] - maxdiff)
+
+        u_valid = (ib_u <= nu) & (ie_u > 0)
+        v_valid = (ib_v <= nv) & (ie_v > 0)
+
+        if u_valid & v_valid
+            if nu * (ie_v - ib_v + 1) > nv * (ie_u - ib_u + 1)
+                # More pairs if we trim v
+                diffs = map_pairwise(-, us[subno], view(vs[subno], ib_v:ie_v))
+            else
+                # More pairs if we trim u
+                diffs = map_pairwise(-, view(us[subno], ib_u:ie_u), vs[subno])
+            end
+        elseif u_valid
+            diffs = map_pairwise(-, view(us[subno], ib_u:ie_u), vs[subno])
+        elseif v_valid
+            diffs = map_pairwise(-, us[subno], view(vs[subno], ib_v:ie_v))
+        else
+            continue
+        end
+
+        ntotal += length(diffs)
+
+        flatdiffs = reshape(diffs, :)
+        h = fit(Histogram, flatdiffs, edges, closed = closed)
+
+        if normalize
+            counts .+= h.weights .- expected_count(nu, nv, binsize, durs[subno])
+            auto_u_sum += corrected_auto_counts(
+                us[subno], binsize, durs[subno], false, false
+            )
+            auto_v_sum += corrected_auto_counts(
+                vs[subno], binsize, durs[subno], false, false
+            )
+        else
+            counts .+= h.weights
+        end
+    end
+    if normalize
+        auto_prod = auto_u_sum * auto_v_sum
+        auto_prod == 0 && error("No points made it!")
+        counts ./=  auto_prod ^ (1 / 2)
+    end
+    counts, centers, ntotal
+end
+
+function xcorr_discrete_validonly(
+    us::AbstractVector{<:Number},
+    vs::AbstractVector{<:Number},
+    dur::Number,
+    maxdiff::Number;
+    kwargs...
+)
+    xcorr_discrete_validonly([us], [vs], [dur], maxdiff; kwargs...)
 end

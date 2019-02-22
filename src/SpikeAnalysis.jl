@@ -18,6 +18,7 @@ using
 export
     xcorr_discrete_normed,
     acorr_discrete_normed,
+    xcorr_discrete_validonly,
     distance_from_discriminant,
     event_intervals,
     empirical_qq,
