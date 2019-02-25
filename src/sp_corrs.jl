@@ -250,34 +250,31 @@ function xcorr_discrete_validonly(
         if u_valid & v_valid
             if nu * (ie_v - ib_v + 1) > nv * (ie_u - ib_u + 1)
                 # More pairs if we trim v
-                diffs = map_pairwise(-, us[subno], view(vs[subno], ib_v:ie_v))
+                diffs = imap_product(-, us[subno], view(vs[subno], ib_v:ie_v))
             else
                 # More pairs if we trim u
-                diffs = map_pairwise(-, view(us[subno], ib_u:ie_u), vs[subno])
+                diffs = imap_product(-, view(us[subno], ib_u:ie_u), vs[subno])
             end
         elseif u_valid
-            diffs = map_pairwise(-, view(us[subno], ib_u:ie_u), vs[subno])
+            diffs = imap_product(-, view(us[subno], ib_u:ie_u), vs[subno])
         elseif v_valid
-            diffs = map_pairwise(-, us[subno], view(vs[subno], ib_v:ie_v))
+            diffs = imap_product(-, us[subno], view(vs[subno], ib_v:ie_v))
         else
             continue
         end
 
         ntotal += length(diffs)
 
-        flatdiffs = reshape(diffs, :)
-        h = fit(Histogram, flatdiffs, edges, closed = closed)
+        glhist!(counts, diffs, edges)
 
         if normalize
-            counts .+= h.weights .- expected_count(nu, nv, binsize, durs[subno])
+            counts .-= expected_count(nu, nv, binsize, durs[subno])
             auto_u_sum += corrected_auto_counts(
                 us[subno], binsize, durs[subno], false, false
             )
             auto_v_sum += corrected_auto_counts(
                 vs[subno], binsize, durs[subno], false, false
             )
-        else
-            counts .+= h.weights
         end
     end
     if normalize
