@@ -210,6 +210,14 @@ function empirical_qq(a::AbstractVector, b::AbstractVector)
     end
 end
 
+function summarize_xcorr_vec(u, dur, maxdiff)
+    l = length(u)
+    ib = searchsortedfirst(u, maxdiff)
+    ie = searchsortedlast(u, dur - maxdiff)
+    valid = (ib <= l) & (ie > 0)
+    l, ib, ie, valid
+end
+
 function xcorr_discrete_validonly(
     us::AbstractVector{<:AbstractVector},
     vs::AbstractVector{<:AbstractVector},
@@ -235,32 +243,25 @@ function xcorr_discrete_validonly(
     auto_v_sum = zero(Float32)
     ntotal = 0
     for subno = 1:n_subsection
-        nu = length(us[subno])
-        nv = length(vs[subno])
-
-        ib_u = searchsortedfirst(us[subno], maxdiff)
-        ib_v = searchsortedfirst(vs[subno], maxdiff)
-
-        ie_u = searchsortedlast(us[subno], durs[subno] - maxdiff)
-        ie_v = searchsortedlast(vs[subno], durs[subno] - maxdiff)
-
-        u_valid = (ib_u <= nu) & (ie_u > 0)
-        v_valid = (ib_v <= nv) & (ie_v > 0)
-
+        nu, ib_u, ie_u, u_valid = summarize_xcorr_vec(
+            us[subno], durs[subno], maxdiff
+        )
+        nv, ib_v, ie_v, v_valid = summarize_xcorr_vec(
+            vs[subno], durs[subno], maxdiff
+        )
         if u_valid & v_valid
-            if nu * (ie_v - ib_v + 1) > nv * (ie_u - ib_u + 1)
-                # More pairs if we trim v
-                diffs = imap_product(-, us[subno], view(vs[subno], ib_v:ie_v))
-            else
-                # More pairs if we trim u
-                diffs = imap_product(-, view(us[subno], ib_u:ie_u), vs[subno])
-            end
-        elseif u_valid
-            diffs = imap_product(-, view(us[subno], ib_u:ie_u), vs[subno])
-        elseif v_valid
-            diffs = imap_product(-, us[subno], view(vs[subno], ib_v:ie_v))
+            # Clip u if that results in more pairs
+            clip_u = nv * (ie_u - ib_u + 1) > nu * (ie_v - ib_v + 1)
+        elseif u_valid | v_valid
+            clip_u = u_valid
         else
             continue
+        end
+
+        if clip_u
+            diffs = imap_product(-, view(us[subno], ib_u:ie_u), vs[subno])
+        else
+            diffs = imap_product(-, us[subno], view(vs[subno], ib_v:ie_v))
         end
 
         ntotal += length(diffs)
