@@ -68,7 +68,10 @@ export
     guess_if_array_contains_song,
     guess_if_score_is_song,
     score_array_for_song,
-    SongGuess
+    SongGuess,
+    probably_song,
+    maybe_song,
+    not_song
 
 include("util.jl")
 include("sp_corrs.jl")
