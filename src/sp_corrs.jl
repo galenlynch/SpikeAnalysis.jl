@@ -210,6 +210,68 @@ function empirical_qq(a::AbstractVector, b::AbstractVector)
     end
 end
 
+function acorr_discrete_validonly(
+    us::AbstractVector{<:AbstractVector},
+    durs::AbstractVector{<:Number},
+    maxdiff::Number;
+    binsize = 0.005,
+    normalize = true
+)
+    n_subsection = length(us)
+    if length(durs) != n_subsection
+        throw(ArgumentError("us, and durs must have same length"))
+    end
+    if maxdiff < binsize
+        error("maxdiff must be bigger than bins")
+    end
+    if any(2 * maxdiff .> durs)
+        error("2 * maxdiff must be smaller than all durs")
+    end
+    edges = 0:binsize:maxdiff
+    centers = edges[1:end-1] .+ binsize / 2
+    nbin = length(edges) - 1
+    counts = zeros(Float32, nbin)
+    auto_u_sum = zero(Float32)
+    ntotal = 0
+    m = 1 / binsize
+
+    for subno = 1:n_subsection
+        ie = searchsortedlast(us[subno], durs[subno] - maxdiff)
+        ie == 0 && continue
+        auto_u_sum += ie
+        l = length(us[subno])
+        for i = 1:ie
+            for j = i + 1:l
+                ntotal += 1
+                d = us[subno][j] - us[subno][i]
+                d >= maxdiff && break
+                _glhist_push!(counts, d, 0, nbin, m)
+                auto_u_sum += ifelse(d < binsize, 1, 0)
+            end
+        end
+
+        if normalize
+            ec = expected_count(l, ie, binsize, durs[subno])
+            counts .-= ec
+            auto_u_sum -= ec
+        end
+    end
+
+    if normalize
+        auto_u_sum == 0 && error("No points made it!")
+        counts ./=  auto_u_sum
+    end
+
+    counts, centers, ntotal
+end
+
+function acorr_discrete_validonly(
+    u::AbstractVector{<:Real}, dur::Real, maxdiff; kwargs...
+)
+    acorr_discrete_validonly([u], [dur], maxdiff; kwargs...)
+end
+
+
 function xcorr_discrete_validonly(
     us::AbstractVector{<:AbstractVector},
     vs::AbstractVector{<:AbstractVector},
