@@ -210,21 +210,12 @@ function empirical_qq(a::AbstractVector, b::AbstractVector)
     end
 end
 
-function summarize_xcorr_vec(u, dur, maxdiff)
-    l = length(u)
-    ib = searchsortedfirst(u, maxdiff)
-    ie = searchsortedlast(u, dur - maxdiff)
-    valid = (ib <= l) & (ie > 0)
-    l, ib, ie, valid
-end
-
 function xcorr_discrete_validonly(
     us::AbstractVector{<:AbstractVector},
     vs::AbstractVector{<:AbstractVector},
     durs::AbstractVector{<:Number},
     maxdiff::Number;
     binsize = 0.005,
-    closed = :left,
     normalize = true
 )
     n_subsection = length(us)
@@ -242,28 +233,12 @@ function xcorr_discrete_validonly(
     auto_u_sum = zero(Float32)
     auto_v_sum = zero(Float32)
     ntotal = 0
+
     for subno = 1:n_subsection
-        nu, ib_u, ie_u, u_valid = summarize_xcorr_vec(
-            us[subno], durs[subno], maxdiff
-        )
-        nv, ib_v, ie_v, v_valid = summarize_xcorr_vec(
-            vs[subno], durs[subno], maxdiff
-        )
-        if u_valid & v_valid
-            # Clip u if that results in more pairs
-            clip_u = nv * (ie_u - ib_u + 1) > nu * (ie_v - ib_v + 1)
-        elseif u_valid | v_valid
-            clip_u = u_valid
-        else
-            continue
-        end
-
-        if clip_u
-            diffs = imap_product(-, view(us[subno], ib_u:ie_u), vs[subno])
-        else
-            diffs = imap_product(-, us[subno], view(vs[subno], ib_v:ie_v))
-        end
-
+        ib = searchsortedfirst(vs[subno], maxdiff)
+        ie = searchsortedlast(vs[subno], durs[subno] - maxdiff)
+        ie < ib && continue
+        diffs = imap_product(-, us[subno], view(vs[subno], ib:ie))
         ntotal += length(diffs)
 
         glhist!(counts, diffs, edges)
@@ -278,11 +253,13 @@ function xcorr_discrete_validonly(
             )
         end
     end
+
     if normalize
         auto_prod = auto_u_sum * auto_v_sum
         auto_prod == 0 && error("No points made it!")
         counts ./=  auto_prod ^ (1 / 2)
     end
+
     counts, centers, ntotal
 end
 
