@@ -297,6 +297,8 @@ function xcorr_discrete_validonly(
     ntotal = 0
 
     for subno = 1:n_subsection
+        nu = length(us[subno])
+        nv = length(vs[subno])
         ib = searchsortedfirst(vs[subno], maxdiff)
         ie = searchsortedlast(vs[subno], durs[subno] - maxdiff)
         ie < ib && continue
