@@ -120,16 +120,31 @@ function find_motifs(
     motif::AbstractVector{<:AbstractString},
     labels_syl,
     offs_syl,
-    durs_syl,
-    motif_len
+    durs_syl
 )
     # Get motif info
+    motif_len = length(motif)
     motif_i = find_subseq(motif, labels_syl)
     motif_ons, motif_offs, motif_durs = motif_info(
         offs_syl, durs_syl, motif_len, motif_i
     )
     p = sortperm(motif_durs, rev = true)
     return motif_i[p], motif_ons[p], motif_offs[p], motif_durs[p]
+end
+
+function find_motifs(
+    motif::AbstractVector{<:AbstractString},
+    syls::AbstractVector{<:MarkedInterval}
+)
+    nsyl = length(syls)
+    labels = get_mark.(syls)
+    offs_syl = Vector{Float64}(undef, nsyl)
+    durs_syl = similar(offs_syl)
+    for (i, s) in enumerate(syls)
+        offs_syl[i], te = bounds(s)
+        durs_syl[i] = te - offs_syl[i]
+    end
+    find_motifs(motif, labels, offs_syl, durs_syl)
 end
 
 """
@@ -166,18 +181,13 @@ trig onset, while `post_expand` specifies time stop after trig offset.
 """
 function trig_data(
     trig_seq::AbstractVector{<:AbstractString},
-    labels_syl::AbstractVector{<:AbstractString},
-    offs_syl::AbstractVector{<:Real},
-    durs_syl::AbstractVector{<:Real},
     syls::AbstractVector{<:MarkedInterval},
     pre::Real,
     post_expand::Union{Real, Nothing} = nothing;
     post::Union{Nothing, Real} = nothing
 )
     trig_len = length(trig_seq)
-    motif_i, motif_ons, motif_offs, motif_durs = find_motifs(
-        trig_seq, labels_syl, offs_syl, durs_syl, trig_len
-    )
+    motif_i, motif_ons, motif_offs, motif_durs = find_motifs(trig_seq, syls)
 
     median_motif_dur = isempty(motif_durs) ? NaN : median(motif_durs)
     if post == nothing
@@ -359,7 +369,7 @@ function add_pres(
                 bounds(expanded[trigno])
             )
         end
-        lastend = bounds(sylls[i])[1]
+        lastend = bounds(sylls[i])[2]
     end
     resize!(expanded, trigno)
     resize!(points, trigno)
