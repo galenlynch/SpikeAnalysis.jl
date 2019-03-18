@@ -161,7 +161,8 @@ end
     )
 
 Finds occurrences of the sub-sequence specified by `trig_seq` in the sequence
-`labels_syl`. Returns a [`TrigSet`](@ref).
+`labels_syl`. Returns a [`TrigSet`](@ref). `post` specifies time to stop after
+trig onset, while `post_expand` specifies time stop after trig offset.
 """
 function trig_data(
     trig_seq::AbstractVector{<:AbstractString},
@@ -311,6 +312,22 @@ function align_events(motif_events::AbstractVector{<:Number}, rt::RasterTrigSyll
     motif_events .- rt.triggered[1][1]
 end
 
+"""
+    function add_pres(
+        rec::NakedInterval{E},
+        sylls::AbstractVector{M},
+        trigsylls::AbstractVector{<:String};
+        pre_syll::Real = 0.03,
+    ) where {E, M<:MarkedInterval{E, <:Any}} -> expanded, points
+
+Expand syllables, `syll` with label in `trigsylls`, by `pre_syll`, up to the
+last syll or the beginning of the `rec` interval.
+
+Returns a tuple where the first elements, `expanded`, is an array of interval
+sets with the original syllable joined with the "pre" period. The second element,
+`points`, is an array of [`NakedPoints`](@ref) with points for syllable onset
+and offset defined on an expanded interval, including the "pre" period.
+"""
 function add_pres(
     rec::NakedInterval{E},
     sylls::AbstractVector{M},
