@@ -5,7 +5,7 @@ Represents a "trigger", which is a sequence of syllables in a longer sequence
 that matches some pattern. This is akin to the trigger of an oscilloscope, or
 electro_gui.
 """
-struct RasterTrigSylls{D, M<:MarkedInterval{D, <:Any}}
+struct RasterTrigSylls{D, M<:MarkedInterval{D, <:AbstractString}}
     triggered::Vector{M}
     other::Vector{M}
     motif_interval::NTuple{2, D}
@@ -333,6 +333,8 @@ end
 Expand syllables, `syll` with label in `trigsylls`, by `pre_syll`, up to the
 last syll or the beginning of the `rec` interval.
 
+Requires input to be sorted and not overlapping.
+
 Returns a tuple where the first elements, `expanded`, is an array of interval
 sets with the original syllable joined with the "pre" period. The second element,
 `points`, is an array of [`NakedPoints`](@ref) with points for syllable onset
@@ -344,6 +346,7 @@ function add_pres(
     trigsylls::AbstractVector{<:String};
     pre_syll::Real = 0.03,
 ) where {E, M<:MarkedInterval{E, <:Any}}
+    intervals_are_ordered(bounds.(sylls)) || error("sylls are not well-ordered")
     n_syll = length(sylls)
     expanded = Vector{
         IntervalSet{E, Tuple{RelativeInterval{E, M, M}, M}}
