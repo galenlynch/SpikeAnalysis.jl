@@ -3,9 +3,11 @@ function xcorr_normed_valid(
     u::AbstractArray{<:AbstractFloat},
     v::AbstractArray{<:AbstractFloat},
     nlag::Integer;
+    norm::Bool = true,
     outeltype::Type = Float32,
-    center::Bool = true
+    center::Bool = norm
 )
+    normcheck(norm, center)
     ulen = length(u)
     length(v) == ulen || error("Don't know what to do")
     ulen > 2 * nlag || error("u is not long enough")
@@ -20,10 +22,24 @@ function xcorr_normed_valid(
         bufflen
     ) = prepare_xcorr(ulen, nlag, outeltype)
     out_norm = _xcorr!(
-        accum, u, ulen, v, r_buf, bufflen, uim_buf, vim_buf, p, ip, nlag, center
+        accum,
+        u,
+        ulen,
+        v,
+        r_buf,
+        bufflen,
+        uim_buf,
+        vim_buf,
+        p,
+        ip,
+        nlag,
+        norm,
+        center
     )
     xcorr_unwrap!(out, accum, nlag, bufflen)
-    out ./= out_norm
+    if norm
+        out ./= out_norm
+    end
     out
 end
 
@@ -32,9 +48,16 @@ function xcorr_normed_valid(
     us::AbstractArray{<:AbstractArray{<:Real}},
     vs::AbstractArray{<:AbstractArray{<:Real}},
     nlag::Integer;
+    norm::Bool = true,
     outtype::Type = Float32,
-    center::Bool = true
+    center::Bool = norm
 )
+    normcheck(norm, center)
+    nu = length(us)
+    length(vs) == nu || error("us and vs must be the same length")
+    el_lens = length.(us)
+    all(el_lens .== length.(vs)) || error("us and vs must have same length elements")
+    minimum(el_lens) >= 2 * nlag + 1 || error("Insufficient length for this xcorr")
     out, accum, r_buf, uim_buf, vim_buf, p, ip, bufflen, nu, u_ls =
         prepare_xcorr(us, vs, nlag, outtype)
     _xcorr_normed_valid!(
@@ -51,9 +74,14 @@ function xcorr_normed_valid(
         ip,
         bufflen,
         nlag,
+        norm,
         center
     )
 end
+
+normcheck(norm, center) = ! norm &&
+    center &&
+    error("Should not center if not norming")
 
 function _xcorr_normed_valid!(
     out::AbstractVector{<:Real},
@@ -69,7 +97,8 @@ function _xcorr_normed_valid!(
     ip,
     bufflen::Integer,
     nlag::Integer,
-    center::Bool = true
+    norm::Bool = true,
+    center::Bool = norm
 )
     accum .= 0
     out_norm = zero(eltype(out))
@@ -86,12 +115,15 @@ function _xcorr_normed_valid!(
             p,
             ip,
             nlag,
+            norm,
             center
         )
     end
 
     xcorr_unwrap!(out, accum, nlag, bufflen)
-    out ./= out_norm
+    if norm
+        out ./= out_norm
+    end
     out
 end
 
@@ -187,7 +219,7 @@ end
 
 # Kernel for xcorr
 function _xcorr!(
-    accum, u, ulen, v, r_buf, buflen, uim_buf, vim_buf, p, ip, nlag, center
+    accum, u, ulen, v, r_buf, buflen, uim_buf, vim_buf, p, ip, nlag, norm, center
 )
     adj_len = ulen - 2 * nlag
     min_side_l = div(adj_len - 1, 2)
@@ -195,10 +227,12 @@ function _xcorr!(
     minleftndx = buflen - min_side_l + 1
     # Transform u
     pad_transform!(u, ulen, r_buf, buflen, uim_buf, p, nlag, center)
-    unorm = rbuf_norm(r_buf, nminright, minleftndx, buflen)
+    unorm = norm ?
+        rbuf_norm(r_buf, nminright, minleftndx, buflen) :
+        zero(eltype(r_buf))
     # Transform v
     pad_transform!(v, ulen, r_buf, buflen, vim_buf, p, 0, center)
-    vnorm = rbuf_norm(r_buf, nminright, minleftndx, buflen)
+    vnorm = norm ? rbuf_norm(r_buf, nminright, minleftndx, buflen) : unorm
     # Multiply to do cross correlation in fourier domain
     uim_buf .*= conj.(vim_buf)
     # inverse fourier transform
@@ -206,7 +240,7 @@ function _xcorr!(
     # Add to accumulator
     accum .+= r_buf
     # return norm for this xcorr
-    sqrt(unorm * vnorm)
+    norm ? sqrt(unorm * vnorm) : zero(div_type(unorm))
 end
 
 function xcorr_unwrap!(out, accum, nlag, n_padded)
@@ -240,10 +274,10 @@ function xcorr_valid_sig(
     chunks_u::AbstractVector{<:AbstractVector},
     chunks_v::AbstractVector{<:AbstractVector},
     xcs_null::AbstractVector{<:Number},
-    n_trial = length(xcs_null),
-    center::Bool = false
+    n_trial = length(xcs_null);
+    kwargs...
 )
-    xc = xcorr_normed_valid(chunks_u, chunks_v, nlag, center = center)
+    xc = xcorr_normed_valid(chunks_u, chunks_v, nlag; kwargs...)
     xcorr_valid_sig(xc, xcs_null, n_trial)
 end
 
@@ -251,11 +285,11 @@ function xcorr_valid_sig(
     nlag::Integer,
     chunks_u::AbstractVector{<:AbstractVector},
     chunks_v::AbstractVector{<:AbstractVector},
-    n_trial = 1000,
-    center::Bool = false
+    n_trial = 1000;
+    kwargs...
 )
-    xcs_null = xcorr_null_mc(chunks_u, chunks_v, nlag, n_trial, center)
-    xcorr_valid_sig(nlag, chunks_u, chunks_v, xcs_null, n_trial, center)
+    xcs_null = xcorr_null_mc(chunks_u, chunks_v, nlag, n_trial; kwargs...)
+    xcorr_valid_sig(nlag, chunks_u, chunks_v, xcs_null, n_trial; kwargs...)
 end
 
 function xcorr_null_mc(
@@ -263,9 +297,11 @@ function xcorr_null_mc(
     vs::AbstractVector{<:AbstractVector},
     nlag::Integer,
     n_trial::Integer = 1000;
+    norm::Bool = true,
     outtype::Type = Float32,
-    center::Bool = false
+    center::Bool = norm
 )
+    normcheck(norm, center)
     extr_out = Vector{outtype}(undef, n_trial)
     out, accum, r_buf, uim_buf, vim_buf, p, ip, bufflen, nu, us_ls =
         prepare_xcorr(us, vs, nlag, outtype)
