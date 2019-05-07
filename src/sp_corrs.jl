@@ -121,7 +121,7 @@ function corrected_auto_counts(
     count_coeff = ifelse(auto, 1, 2)
     if edgecorrect
         nu = length(u)
-        corrected_cnt = basecount - count_coeff * t_count_edge_corrected(
+        corrected_cnt = basecount - count_coeff * expected_count_edge_corrected(
             binsize, nu, binsize, dur
         )
     else
@@ -212,14 +212,15 @@ end
 
 function acorr_discrete_validonly(
     us::AbstractVector{<:AbstractVector},
-    durs::AbstractVector{<:Number},
+    bounds::AbstractVector{<:NTuple{2, <:Number}},
     maxdiff::Number;
     binsize = 0.005,
     normalize = true
 )
     n_subsection = length(us)
-    if length(durs) != n_subsection
-        throw(ArgumentError("us, and durs must have same length"))
+    durs = measure.(bounds)
+    if length(bounds) != n_subsection
+        throw(ArgumentError("us, and bounds must have same length"))
     end
     if maxdiff < binsize
         error("maxdiff must be bigger than bins")
@@ -236,7 +237,7 @@ function acorr_discrete_validonly(
     m = 1 / binsize
 
     for subno = 1:n_subsection
-        ie = searchsortedlast(us[subno], durs[subno] - maxdiff)
+        ie = searchsortedlast(us[subno], bounds[subno][2] - maxdiff)
         ie == 0 && continue
         auto_u_sum += ie
         l = length(us[subno])
@@ -245,8 +246,8 @@ function acorr_discrete_validonly(
                 ntotal += 1
                 d = us[subno][j] - us[subno][i]
                 d >= maxdiff && break
-                _glhist_push!(counts, d, 0, nbin, m)
-                auto_u_sum += ifelse(d < binsize, 1, 0)
+                @inbounds _glhist_push!(counts, d, 0, nbin, m)
+                auto_u_sum += d < binsize
             end
         end
 
@@ -266,7 +267,16 @@ function acorr_discrete_validonly(
 end
 
 function acorr_discrete_validonly(
-    u::AbstractVector{<:Real}, dur::Real, maxdiff; kwargs...
+    us, durs::AbstractVector{<:Number}, maxdiff; kwargs...
+)
+    acorr_discrete_validonly(
+        us, tuple.(zero(eltype(durs)), durs), maxdiff; kwargs...
+    )
+end
+
+
+function acorr_discrete_validonly(
+    u::AbstractVector{<:Real}, dur::Number, maxdiff; kwargs...
 )
     acorr_discrete_validonly([u], [dur], maxdiff; kwargs...)
 end
@@ -275,18 +285,19 @@ end
 function xcorr_discrete_validonly(
     us::AbstractVector{<:AbstractVector},
     vs::AbstractVector{<:AbstractVector},
-    durs::AbstractVector{<:Number},
+    bounds::AbstractVector{<:NTuple{2, <:Number}},
     maxdiff::Number;
     binsize = 0.005,
     normalize = true
 )
     n_subsection = length(us)
-    if length(vs) != n_subsection || length(durs) != n_subsection
-        throw(ArgumentError("us, vs, and durs must have same length"))
+    if length(vs) != n_subsection || length(bounds) != n_subsection
+        throw(ArgumentError("us, vs, and bounds must have same length"))
     end
     if maxdiff < binsize
         error("maxdiff must be bigger than bins")
     end
+    durs = measure.(bounds)
     if any(2 * maxdiff .> durs)
         error("2 * maxdiff must be smaller than all durs")
     end
@@ -299,8 +310,8 @@ function xcorr_discrete_validonly(
     for subno = 1:n_subsection
         nu = length(us[subno])
         nv = length(vs[subno])
-        ib = searchsortedfirst(vs[subno], maxdiff)
-        ie = searchsortedlast(vs[subno], durs[subno] - maxdiff)
+        ib = searchsortedfirst(vs[subno], bounds[subno][1] + maxdiff)
+        ie = searchsortedlast(vs[subno], bounds[subno][2] - maxdiff)
         ie < ib && continue
         diffs = imap_product(-, us[subno], view(vs[subno], ib:ie))
         ntotal += length(diffs)
@@ -325,6 +336,14 @@ function xcorr_discrete_validonly(
     end
 
     counts, centers, ntotal
+end
+
+function xcorr_discrete_validonly(
+    us, vs, durs::AbstractVector{<:Number}, maxdiff; kwargs...
+)
+    xcorr_discrete_validonly(
+        us, vs, tuple.(zero(eltype(durs)), durs), maxdiff; kwargs...
+    )
 end
 
 function xcorr_discrete_validonly(
