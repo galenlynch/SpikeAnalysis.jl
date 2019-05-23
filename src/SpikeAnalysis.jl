@@ -43,7 +43,7 @@ export
     RasterTrigSylls,
     trig_data,
     align_trigs,
-    group_align_events,
+    align_to_trigger_onset,
     clip_trigs,
     call_bouts,
     ifr!,

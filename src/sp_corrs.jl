@@ -202,12 +202,19 @@ function empirical_qq(a::AbstractVector, b::AbstractVector)
         # Make inverse empirical distribution
         if na > nb
             interp_linear = LinearInterpolation((1:na) / na, a)
-            return [(interp_linear(i / nb), x) for (i, x) in enumerate(b)]
+            outs = Vector{NTuple{2, Float64}}(undef, nb)
+            for i in 1:nb
+                outs[i] = (interp_linear(i / nb), b[i])
+            end
         else
             interp_linear = LinearInterpolation((1:nb) / nb, b)
-            return [(x, interp_linear(i / na)) for (i, x) in enumerate(a)]
+            outs = Vector{NTuple{2, Float64}}(undef, na)
+            for i in 1:na
+                outs[i] = (a[i], interp_linear(i / na))
+            end
         end
     end
+    return outs
 end
 
 function acorr_discrete_validonly(
@@ -259,7 +266,6 @@ function acorr_discrete_validonly(
     end
 
     if normalize
-        auto_u_sum == 0 && error("No points made it!")
         counts ./=  auto_u_sum
     end
 

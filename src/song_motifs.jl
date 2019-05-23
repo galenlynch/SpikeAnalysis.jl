@@ -210,12 +210,13 @@ function trig_data(
     TrigSet(trigs, motif_durs, median_motif_dur, pre, post)
 end
 
-function group_align_events(event_set::AbstractVector, trigs::TrigSet)
-    map(rt -> group_align_events(event_set, rt), trigs.trigs)
-end
-function group_align_events(event_set, trig::RasterTrigSylls)
+function align_to_trigger_onset(event_set, trig::RasterTrigSylls)
     mask_events(event_set, trig.expanded_interval...) .-
         bounds(trig.triggered[1].interval)[1]
+end
+
+function align_to_trigger_onset(event_set::AbstractVector, trigs::TrigSet)
+    map(rt -> align_to_trigger_onset(event_set, rt), trigs.trigs)
 end
 
 function motif_events(event_set::AbstractVector, trigs::TrigSet)
@@ -331,7 +332,7 @@ end
     ) where {E, M<:MarkedInterval{E, <:Any}} -> expanded, points
 
 Expand syllables, `syll` with label in `trigsylls`, by `pre_syll`, up to the
-last syll or the beginning of the `rec` interval.
+last syll or the `bound_start`.
 
 Requires input to be sorted and not overlapping.
 
@@ -341,7 +342,7 @@ sets with the original syllable joined with the "pre" period. The second element
 and offset defined on an expanded interval, including the "pre" period.
 """
 function add_pres(
-    rec::NakedInterval{E},
+    bound_start,
     sylls::AbstractVector{M},
     trigsylls::AbstractVector{<:String};
     pre_syll::Real = 0.03,
@@ -353,7 +354,7 @@ function add_pres(
     }(undef, n_syll)
     points = Vector{NakedPoints{E, NakedInterval{E}, Vector{E}}}(undef, n_syll)
     trigno = 0
-    lastend = bounds(rec)[1]
+    lastend = bound_start
     for (i, syll) = enumerate(sylls)
         if any(get_mark(syll) .== trigsylls)
             trigno += 1
@@ -405,16 +406,14 @@ function grow_intervals(
     for i in 2:nint
         this_mark = get_mark(ints[i])
         b, e = bounds(ints[i])
-        this_int = b - last_end
+        dist_since_last = b - last_end
 
         if growing
-            growing = (this_int <= max_dist) & anyeq(this_mark, all_marks)
+            growing = (dist_since_last <= max_dist) & anyeq(this_mark, all_marks)
             if ! growing # end of growing section
-                elig_index = i + 1
                 intno += 1
                 ints_merged[intno] = NakedInterval(joined_start, last_end)
             end
-
         elseif anyeq(this_mark, seed_marks)
             # start interval
             growing = true
@@ -437,8 +436,12 @@ function grow_intervals(
 
         last_end = e
     end
+    if growing
+        intno += 1
+        ints_merged[intno] = NakedInterval(joined_start, last_end)
+    end
 
-    resize!(ints_merged, intno)
+    clipsize!(ints_merged, intno)
     ints_merged
 end
 
