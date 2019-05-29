@@ -280,13 +280,11 @@ function acorr_discrete_validonly(
     )
 end
 
-
 function acorr_discrete_validonly(
     u::AbstractVector{<:Real}, dur::Number, maxdiff; kwargs...
 )
     acorr_discrete_validonly([u], [dur], maxdiff; kwargs...)
 end
-
 
 function xcorr_discrete_validonly(
     us::AbstractVector{<:AbstractVector},
