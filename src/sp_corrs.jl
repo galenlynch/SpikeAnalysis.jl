@@ -359,3 +359,16 @@ function xcorr_discrete_validonly(
 )
     xcorr_discrete_validonly([us], [vs], [dur], maxdiff; kwargs...)
 end
+
+function xcorr_discrete_validonly(
+    us::AbstractVector{<:Points{<:Any, <:Any, <:Any, <:NakedPoint}},
+    vs::AbstractVector{<:Points{<:Any, <:Any, <:Any, <:NakedPoint}},
+    maxdiff::Number;
+    kwargs...
+)
+    bnds = bounds.(us)
+    all(bnds .== bounds.(vs)) || error("Bounds do not match")
+    xcorr_discrete_validonly(
+        nakedvalues.(us), nakedvalues.(vs), bnds, maxdiff; kwargs...
+    )
+end
