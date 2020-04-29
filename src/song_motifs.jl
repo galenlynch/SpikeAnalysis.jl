@@ -396,25 +396,29 @@ function grow_intervals(
         return Vector{D}()
     end
     ints_merged = Vector{D}(undef, nint)
-    all_marks = vcat(seed_marks, join_marks)
+    seed_set = Set(seed_marks)
+    grow_set = copy(seed_set)
+    for mark in join_marks
+        push!(grow_set, mark)
+    end
 
     intno = 0
     elig_idx = 1
     joined_start = bounds(ints[1])[1]
     last_end = bounds(ints[1])[2]
-    growing = anyeq(get_mark(ints[1]), seed_marks)
+    growing = get_mark(ints[1]) in seed_set
     for i in 2:nint
         this_mark = get_mark(ints[i])
         b, e = bounds(ints[i])
         dist_since_last = b - last_end
 
         if growing
-            growing = (dist_since_last <= max_dist) & anyeq(this_mark, all_marks)
+            growing = (dist_since_last <= max_dist) & (this_mark in grow_set)
             if ! growing # end of growing section
                 intno += 1
                 ints_merged[intno] = NakedInterval(joined_start, last_end)
             end
-        elseif anyeq(this_mark, seed_marks)
+        elseif this_mark in seed_set
             # start interval
             growing = true
 
@@ -424,7 +428,7 @@ function grow_intervals(
             last_b = b
             while (
                 back_i >= elig_idx &&
-                anyeq(get_mark(ints[back_i]), all_marks) &&
+                get_mark(ints[back_i]) in grow_set &&
                 last_b - bounds(ints[back_i])[2] <= max_dist
             )
                 last_b = bounds(ints[back_i])[1]
@@ -437,6 +441,7 @@ function grow_intervals(
         last_end = e
     end
     if growing
+        # Resolve pending interval
         intno += 1
         ints_merged[intno] = NakedInterval(joined_start, last_end)
     end
