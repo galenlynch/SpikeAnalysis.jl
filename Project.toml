@@ -1,0 +1,30 @@
+name = "SpikeAnalysis"
+uuid = "acfd8622-5368-561c-8721-366ff6cfe777"
+authors = ["Galen Lynch <galen.lynch@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
+Destruct = "dde75ccc-4946-507f-85f2-ccadd28c929c"
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+GLUtilities = "8b4c6747-1f02-570a-a961-a96037df41d6"
+Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+PointProcesses = "1751c77c-d90c-5130-9faa-3b4ea8d90a70"
+SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+TSConditioning = "65444e21-13b1-5fbd-b269-b51e5fd998ef"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+DSP = "0.6"
+Destruct = "1"
+FFTW = "1"
+GLUtilities = "0.1"
+Interpolations = "0.12"
+PointProcesses = "0.1"
+StatsBase = "0.32 - 0.33"
+TSConditioning = "0.1"
+julia = "0.6, 0.7, 1"

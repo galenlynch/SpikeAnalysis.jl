@@ -13,7 +13,8 @@ using
     Statistics,
     PointProcesses,
     Distributed,
-    SharedArrays
+    SharedArrays,
+    TSConditioning
 
 using GLUtilities: _glhist_push!
 
