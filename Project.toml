@@ -1,7 +1,7 @@
 name = "SpikeAnalysis"
 uuid = "acfd8622-5368-561c-8721-366ff6cfe777"
 authors = ["Galen Lynch <galen.lynch@gmail.com>"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
@@ -22,7 +22,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 DSP = "0.6"
 Destruct = "1"
 FFTW = "1"
-GLUtilities = "0.1"
+GLUtilities = "0.1 - 0.2"
 Interpolations = "0.12"
 PointProcesses = "0.1"
 StatsBase = "0.32 - 0.33"
