@@ -6,7 +6,6 @@ using
     StatsBase,
     GLUtilities,
     Destruct,
-    Interpolations,
     FFTW,
     DSP,
     LinearAlgebra,
@@ -15,6 +14,11 @@ using
     Distributed,
     SharedArrays,
     TSConditioning
+
+using Interpolations: LinearInterpolation, AbstractInterpolation
+using PointProcesses: bounds, NakedInterval, MarkedInterval, RelativeInterval,
+    IntervalSet, Points, NakedPoints, complement, shrink, mask_events,
+    nakedvalues
 
 using GLUtilities: _glhist_push!
 

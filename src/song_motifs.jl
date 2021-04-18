@@ -156,10 +156,10 @@ function call_bouts(
     seed_marks,
     join_marks,
     max_dist,
-    contraction = max_dist
+    silence_contraction = max_dist
 )
     bouts = grow_intervals(rec_int, ints_syll, seed_marks, join_marks, max_dist)
-    silence_intervals = shrink(complement(rec_int, bouts), contraction)
+    silence_intervals = shrink(complement(rec_int, bouts), silence_contraction)
     return bouts, silence_intervals
 end
 
