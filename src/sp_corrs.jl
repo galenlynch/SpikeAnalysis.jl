@@ -1,5 +1,33 @@
 # Inputs must be sorted, must be unique
 # If points are not unique, normalization will be wrong
+"""
+    xcorr_discrete_normed(us, vs, durs; binsize=0.005, maxdiff=nothing, edgecorrect=true, closed=:left)
+
+Calculate the normalized cross-correlation of two sets of discrete time points.
+
+# Parameters
+- `us::AbstractVector{<:AbstractVector{<:Number}}`: A collection of sets of
+  discrete time points.
+- `vs::AbstractVector{<:AbstractVector{<:Number}}`: A collection of sets of
+  discrete time points corresponding to `us`.
+- `durs::AbstractVector{<:Number}`: Duration of each subsection. Must have the
+  same length as `us` and `vs`.
+- `binsize::Number=0.005`: Bin size for the histogramming of time differences.
+- `maxdiff::Union{Number, Nothing}=nothing`: Maximum time difference to
+  consider. If set to `nothing`, it is determined by the maximum of `durs`.
+- `edgecorrect::Bool=true`: Whether to apply edge correction to the histogram.
+- `closed=:left`: Which side of the bin intervals is closed. Either `:left` or `:right`.
+
+# Returns
+- `counts`: Normalized cross-correlation histogram counts.
+- `centers`: Centers of the bins in the histogram.
+
+# Notes
+- The inputs `us` and `vs` must be sorted and unique. If the points are not
+  unique, the normalization will be incorrect.
+- Throws an error if `maxdiff` is provided and is less than `binsize`.
+- Throws an ArgumentError if the lengths of `us`, `vs`, and `durs` are not the same.
+"""
 function xcorr_discrete_normed(
     us::AbstractVector{<:AbstractVector{<:Number}},
     vs::AbstractVector{<:AbstractVector{<:Number}},
