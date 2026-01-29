@@ -20,7 +20,7 @@ using Compat,
     SpikeAnalysis,
     Combinatorics
 
-const conn_str =  "postgresql://galen@localhost:5433/galen"
+const conn_str = "postgresql://galen@localhost:5433/galen"
 const sql_q_str = """
 WITH seed_rid AS (
      SELECT \$1::integer AS recording_id
@@ -85,13 +85,14 @@ const spkdf = fetch!(DataFrame, execute(spike_stmt, [song_rid]))
 
 const ch_of_interest = [6, 26, 28]
 
-mask = (spkdf[:type_name] .== "spike-good") .&
+mask =
+    (spkdf[:type_name] .== "spike-good") .&
     map(x->x in ch_of_interest, spkdf[:channel_number])
 
-gooddf = spkdf[mask,:]
+gooddf = spkdf[mask, :]
 xs = disallowmissing(gooddf[:point_x])
 ys = disallowmissing(gooddf[:point_y])
-vecs = [[x, y] for (x,y) in zip(xs, ys)]
+vecs = [[x, y] for (x, y) in zip(xs, ys)]
 
 spv = disallowmissing(gooddf[:spikes])
 
@@ -103,9 +104,7 @@ lagmask = abs.(centers) .<= maxlag;
 fig, ax = subplots(3, 1, sharex = true, sharey = true)
 
 function plotpair(idx, ia, ib)
-    xc, centers = xcorr_discrete_normed(
-        spv[ia], spv[ib], dur, binsize = 0.01
-    )
+    xc, centers = xcorr_discrete_normed(spv[ia], spv[ib], dur, binsize = 0.01)
     d = euclidean(vecs[ia], vecs[ib])
     namea = gooddf[ia, :channel_number]
     nameb = gooddf[ib, :channel_number]
@@ -127,8 +126,8 @@ subplot(3, 1, 2)
 plot(centers[lagmask], xc[lagmask])
 
 muachans = 12:22
-muamask = (spkdf[:type_name] .== "spike-mua") .&
-    map(x->x in muachans, spkdf[:channel_number])
+muamask =
+    (spkdf[:type_name] .== "spike-mua") .& map(x->x in muachans, spkdf[:channel_number])
 
 muadf = spkdf[muamask, :]
 
@@ -137,17 +136,16 @@ nmua = size(muadf, 1)
 idxpairs = collect(combinations(1:nmua, 2))
 npair = length(idxpairs)
 
-mua_xcorrs = Vector{NTuple{3, Float64}}(undef, npair)
+mua_xcorrs = Vector{NTuple{3,Float64}}(undef, npair)
 xs = disallowmissing(muadf[:point_x])
 ys = disallowmissing(muadf[:point_y])
-vecs = [[x, y] for (x,y) in zip(xs, ys)]
+vecs = [[x, y] for (x, y) in zip(xs, ys)]
 
 for i = 1:npair
     ia, ib = idxpairs[i]
     d = euclidean(vecs[ia], vecs[ib])
-    xc, centers = xcorr_discrete_normed(
-        muadf[ia, :spikes], muadf[ib, :spikes], dur, binsize = 0.01
-    )
+    xc, centers =
+        xcorr_discrete_normed(muadf[ia, :spikes], muadf[ib, :spikes], dur, binsize = 0.01)
     clxc = xc[lagmask]
     clc = centers[lagmask]
     ibest = argmax(abs.(clxc))
@@ -164,9 +162,8 @@ nfol = length(followups)
 fig, ax = subplots(nfol, 1, sharex = true, sharey = true)
 for i = 1:nfol
     ia, ib = followups[i]
-    xc, centers = xcorr_discrete_normed(
-        muadf[ia, :spikes], muadf[ib, :spikes], dur, binsize = 0.01
-    )
+    xc, centers =
+        xcorr_discrete_normed(muadf[ia, :spikes], muadf[ib, :spikes], dur, binsize = 0.01)
     d = euclidean(to_displ_vec(muadf, ia), to_displ_vec(muadf, ib))
     namea = muadf[ia, :channel_number]
     nameb = muadf[ib, :channel_number]

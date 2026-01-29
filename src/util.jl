@@ -1,7 +1,7 @@
 function make_sym_bins(bextent, binsize)
     n_sidebins = convert(Int, cld(bextent - binsize / 2, binsize))
-    edges = ((-n_sidebins - 1/2):1:(n_sidebins + 1/2)) * binsize
-    centers = (-n_sidebins:1:n_sidebins) * binsize
+    edges = ((-n_sidebins-1/2):1:(n_sidebins+1/2)) * binsize
+    centers = ((-n_sidebins):1:n_sidebins) * binsize
     edges, centers, n_sidebins
 end
 
@@ -17,10 +17,10 @@ function hist_density_reps(
     range_b::Number,
     range_e::Number;
     binsize::Number = 0.01,
-    closed::Symbol =  :left,
+    closed::Symbol = :left,
 )
     nrep = length(pts)
-    max_edge = fld((range_e - range_b),  binsize) * binsize + range_b
+    max_edge = fld((range_e - range_b), binsize) * binsize + range_b
     edges = range_b:binsize:max_edge
     allpts = cat(pts...; dims = 1)
     h = fit(Histogram, allpts, edges; closed = closed)
@@ -29,14 +29,14 @@ function hist_density_reps(
 end
 
 function missing_mean(
-    a::AbstractVector{<:AbstractVector{<:Union{Missing, T}}};
-    dims = 1
-) where T
+    a::AbstractVector{<:AbstractVector{<:Union{Missing,T}}};
+    dims = 1,
+) where {T}
     na = length(a)
     na == 0 && throw(ArgumentError("a is empty"))
     nel = length(a[1])
     allsame(length, a) || throw(ArgumentError("vectors in a should be same length"))
-    out = Vector{Union{Missing, div_type(T)}}(undef, nel)
+    out = Vector{Union{Missing,div_type(T)}}(undef, nel)
     for elno = 1:nel
         elsum = 0
         elcnt = 0
@@ -60,12 +60,12 @@ function hist_quantiles_reps(
     range_b::Number,
     range_e::Number;
     binsize::Number = 0.01,
-    closed::Symbol =  :left,
+    closed::Symbol = :left,
     qs = [0.25, 0.5, 0.75],
-    outtype::Type = Float32
+    outtype::Type = Float32,
 )
     nrep = length(pts)
-    max_edge = cld((range_e - range_b),  binsize) * binsize + range_b
+    max_edge = cld((range_e - range_b), binsize) * binsize + range_b
     edges = range_b:binsize:max_edge
     nw = length(edges) - 1
     nq = length(qs)

@@ -12,7 +12,7 @@ using Revise,
     GLUtilities,
     LIBSVM
 
-const conn_str =  "postgresql://galen@localhost:5433/galen";
+const conn_str = "postgresql://galen@localhost:5433/galen";
 const conn = LibPQ.Connection(conn_str);
 const sr = 40000
 const subs_searchdir = "/home/glynch/Documents/Data/Screening/7406/2018-04-05"
@@ -32,9 +32,7 @@ nt = execute_fetch(conn, q_str, NamedTuple, true);
 anno_dates = Date.(nt.rec_date);
 b_song = make_bandpass(40000, 1000, 6000, 151);
 
-function song_predictor_files(
-    files::AbstractVector{<:AbstractString}, b_song, sr
-)
+function song_predictor_files(files::AbstractVector{<:AbstractString}, b_song, sr)
     nf = length(files)
     mean_song_i = Vector{Float64}(undef, nf)
     rhythm_pow = similar(mean_song_i)
@@ -50,7 +48,7 @@ function song_predictor_labels(
     bird_id::Integer,
     anno_date::Date,
     b_song::AbstractVector,
-    sr::Number
+    sr::Number,
 )
     nt = get_ag_files_and_song_status(conn, bird_id, anno_date)
     dbf = dbfiles(nt)
@@ -66,11 +64,7 @@ function song_predictor_labels(
 end
 
 all_song_i, all_rhythm_pow, all_has_song = destruct(
-    map(
-        (id, d) -> song_predictor_labels(conn, id, d, b_song, sr),
-        nt.bird_id,
-        anno_dates
-    )
+    map((id, d) -> song_predictor_labels(conn, id, d, b_song, sr), nt.bird_id, anno_dates),
 )
 
 flat_song_i = reduce(vcat, all_song_i)
@@ -91,9 +85,7 @@ song_f = getindex.(Ref(lookup), 689:694)
 non_song_f = getindex.(Ref(lookup), 589:688)
 
 subs_song_i, subs_song_rhythm_pow = song_predictor_files(song_f, b_song, sr)
-subs_non_song_i, subs_non_song_rhythm_pow = song_predictor_files(
-    non_song_f, b_song, sr
-)
+subs_non_song_i, subs_non_song_rhythm_pow = song_predictor_files(non_song_f, b_song, sr)
 
 n_juv = length(flat_song_i)
 n_subs = length(subs_song_i)
@@ -104,14 +96,14 @@ labels = Vector{Symbol}(undef, tot);
 
 feats[1, 1:n_juv] = flat_song_i;
 feats[2, 1:n_juv] = flat_rhythm_pow;
-feats[1, n_juv+1:n_juv+n_subs] = subs_song_i;
-feats[2, n_juv+1:n_juv+n_subs] = subs_song_rhythm_pow;
-feats[1, n_juv+n_subs+1:n_juv+ n_subs+n_subs_cage] = subs_non_song_i;
-feats[2, n_juv+n_subs+1:n_juv + n_subs+n_subs_cage] = subs_non_song_rhythm_pow;
+feats[1, (n_juv+1):(n_juv+n_subs)] = subs_song_i;
+feats[2, (n_juv+1):(n_juv+n_subs)] = subs_song_rhythm_pow;
+feats[1, (n_juv+n_subs+1):(n_juv+n_subs+n_subs_cage)] = subs_non_song_i;
+feats[2, (n_juv+n_subs+1):(n_juv+n_subs+n_subs_cage)] = subs_non_song_rhythm_pow;
 
 labels[1:n_juv] = map(x -> ifelse(x, :song, :non_song), flat_has_song)
-labels[n_juv+1:n_juv+n_subs] .= :sub_song
-labels[n_juv+n_subs+1:n_juv + n_subs+n_subs_cage] .= :non_song
+labels[(n_juv+1):(n_juv+n_subs)] .= :sub_song
+labels[(n_juv+n_subs+1):(n_juv+n_subs+n_subs_cage)] .= :non_song
 
 subs_mask = labels .== :sub_song
 cage_noise_mask = labels .== :non_song
@@ -132,7 +124,7 @@ disc_intercept = -234.00380952380965
 line_pt_dist(x, y) = - (disc_slope * x - y + disc_intercept) / sqrt(disc_slope ^ 2 + 1)
 
 projs = Vector{Float64}(undef, tot)
-for i in 1:tot
+for i = 1:tot
     projs[i] = line_pt_dist(feats[1, i], feats[2, i])
 end
 
@@ -147,7 +139,7 @@ end
 ld = fit(LinearDiscriminant, feats[:, song_mask], feats[:, cage_noise_mask])
 
 ld_projs = Vector{Float64}(undef, tot)
-for i in 1:tot
+for i = 1:tot
     ld_projs[i] = evaluate(ld, feats[:, i])
 end
 

@@ -2,8 +2,7 @@ module SpikeAnalysis
 
 import DSP.Periodograms.fft2pow!
 
-using
-    StatsBase,
+using StatsBase,
     GLUtilities,
     Destruct,
     FFTW,
@@ -16,14 +15,22 @@ using
     TSConditioning
 
 using Interpolations: LinearInterpolation, AbstractInterpolation
-using PointProcesses: bounds, NakedInterval, MarkedInterval, RelativeInterval,
-    IntervalSet, Points, NakedPoints, complement, shrink, mask_events,
+using PointProcesses:
+    bounds,
+    NakedInterval,
+    MarkedInterval,
+    RelativeInterval,
+    IntervalSet,
+    Points,
+    NakedPoints,
+    complement,
+    shrink,
+    mask_events,
     nakedvalues
 
 using GLUtilities: _glhist_push!
 
-export
-    xcorr_discrete_normed,
+export xcorr_discrete_normed,
     acorr_discrete_normed,
     xcorr_discrete_validonly,
     acorr_discrete_validonly,
