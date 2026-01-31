@@ -3,13 +3,14 @@ using Compat,
     GLFileCache,
     LibPQ,
     OEUtilities,
-    GLUtilities,
+    SignalIndices,
+    SortedIntervals,
     TSConditioning,
     DSP,
     OpenEphysLoader,
-    GLPlotting,
+    SignalPlots,
     OEPlotting,
-    GLTimeseries,
+    DynamicTimeseries,
     PyQtGraph,
     PyCall,
     Phy,
@@ -391,7 +392,7 @@ overlay_ax[:set_ylabel]("Std. from baseline")
 overlay_ax[:set_title]("Waveforms")
 
 c_this_elec = PyPlot.matplotlib[:patches][:Circle](
-    (x_ch[spk_idx], y_ch[spk_idx]), GLPlotting.PI_PITCH / 2,
+    (x_ch[spk_idx], y_ch[spk_idx]), SignalPlots.PI_PITCH / 2,
     edgecolor = "none"
 )
 pos_ax[:add_patch](c_this_elec)

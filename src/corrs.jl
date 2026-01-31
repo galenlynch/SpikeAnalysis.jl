@@ -5,22 +5,14 @@ function xcorr_normed_valid(
     nlag::Integer;
     norm::Bool = true,
     outeltype::Type = Float32,
-    center::Bool = norm
+    center::Bool = norm,
 )
     normcheck(norm, center)
     ulen = length(u)
     length(v) == ulen || error("Don't know what to do")
     ulen > 2 * nlag || error("u is not long enough")
-    (
-        out,
-        accum,
-        r_buf,
-        uim_buf,
-        vim_buf,
-        p,
-        ip,
-        bufflen
-    ) = prepare_xcorr(ulen, nlag, outeltype)
+    (out, accum, r_buf, uim_buf, vim_buf, p, ip, bufflen) =
+        prepare_xcorr(ulen, nlag, outeltype)
     out_norm = _xcorr!(
         accum,
         u,
@@ -34,7 +26,7 @@ function xcorr_normed_valid(
         ip,
         nlag,
         norm,
-        center
+        center,
     )
     xcorr_unwrap!(out, accum, nlag, bufflen)
     if norm
@@ -50,7 +42,7 @@ function xcorr_normed_valid(
     nlag::Integer;
     norm::Bool = true,
     outtype::Type = Float32,
-    center::Bool = norm
+    center::Bool = norm,
 )
     normcheck(norm, center)
     nu = length(us)
@@ -75,13 +67,11 @@ function xcorr_normed_valid(
         bufflen,
         nlag,
         norm,
-        center
+        center,
     )
 end
 
-normcheck(norm, center) = ! norm &&
-    center &&
-    error("Should not center if not norming")
+normcheck(norm, center) = ! norm && center && error("Should not center if not norming")
 
 function _xcorr_normed_valid!(
     out::AbstractVector{<:Real},
@@ -98,7 +88,7 @@ function _xcorr_normed_valid!(
     bufflen::Integer,
     nlag::Integer,
     norm::Bool = true,
-    center::Bool = norm
+    center::Bool = norm,
 )
     accum .= 0
     out_norm = zero(eltype(out))
@@ -116,7 +106,7 @@ function _xcorr_normed_valid!(
             ip,
             nlag,
             norm,
-            center
+            center,
         )
     end
 
@@ -142,16 +132,7 @@ function prepare_xcorr(nu, nlag, outeltype)
     p = plan_rfft(r_buf)
     ip = plan_irfft(uim_buf, bufflen)
 
-    return (
-        out,
-        accum,
-        r_buf,
-        uim_buf,
-        vim_buf,
-        p,
-        ip,
-        bufflen
-    )
+    return (out, accum, r_buf, uim_buf, vim_buf, p, ip, bufflen)
 end
 
 function prepare_xcorr(
@@ -163,32 +144,14 @@ function prepare_xcorr(
     nu = length(us)
     nu == length(vs) || throw(ArgumentError("us and vs not the same length"))
     u_ls = length.(us)
-    all(u_ls .== length.(vs)) || throw(ArgumentError("elements of us must be same len as vs"))
+    all(u_ls .== length.(vs)) ||
+        throw(ArgumentError("elements of us must be same len as vs"))
     u_max_l = maximum(u_ls)
 
-    (
-        out,
-        accum,
-        r_buf,
-        uim_buf,
-        vim_buf,
-        p,
-        ip,
-        bufflen
-    ) = prepare_xcorr(u_max_l, nlag, outtype)
+    (out, accum, r_buf, uim_buf, vim_buf, p, ip, bufflen) =
+        prepare_xcorr(u_max_l, nlag, outtype)
 
-    return (
-        out,
-        accum,
-        r_buf,
-        uim_buf,
-        vim_buf,
-        p,
-        ip,
-        bufflen,
-        nu,
-        u_ls
-    )
+    return (out, accum, r_buf, uim_buf, vim_buf, p, ip, bufflen, nu, u_ls)
 end
 
 # Mutates r_buf and im_buf
@@ -203,7 +166,7 @@ function pad_transform!(u, ulen, r_buf, buflen, im_buf, p, nlag, center)
     copyto!(r_buf, 1, u, center_ndx, nright)
     left_ndx = buflen - nleft + 1
     copyto!(r_buf, left_ndx, u, 1 + nlag, nleft)
-    r_buf[nright + 1:left_ndx - 1] .= 0
+    r_buf[(nright+1):(left_ndx-1)] .= 0
     if center
         mu = mean(u)
         r_buf[1:nright] .-= mu
@@ -213,13 +176,24 @@ function pad_transform!(u, ulen, r_buf, buflen, im_buf, p, nlag, center)
 end
 
 function rbuf_norm(r_buf, nminright, minleftndx, buflen)
-    sum(abs2, view(r_buf, 1:nminright)) +
-        sum(abs2, view(r_buf, minleftndx:buflen))
+    sum(abs2, view(r_buf, 1:nminright)) + sum(abs2, view(r_buf, minleftndx:buflen))
 end
 
 # Kernel for xcorr
 function _xcorr!(
-    accum, u, ulen, v, r_buf, buflen, uim_buf, vim_buf, p, ip, nlag, norm, center
+    accum,
+    u,
+    ulen,
+    v,
+    r_buf,
+    buflen,
+    uim_buf,
+    vim_buf,
+    p,
+    ip,
+    nlag,
+    norm,
+    center,
 )
     adj_len = ulen - 2 * nlag
     min_side_l = div(adj_len - 1, 2)
@@ -227,9 +201,7 @@ function _xcorr!(
     minleftndx = buflen - min_side_l + 1
     # Transform u
     pad_transform!(u, ulen, r_buf, buflen, uim_buf, p, nlag, center)
-    unorm = norm ?
-        rbuf_norm(r_buf, nminright, minleftndx, buflen) :
-        zero(eltype(r_buf))
+    unorm = norm ? rbuf_norm(r_buf, nminright, minleftndx, buflen) : zero(eltype(r_buf))
     # Transform v
     pad_transform!(v, ulen, r_buf, buflen, vim_buf, p, 0, center)
     vnorm = norm ? rbuf_norm(r_buf, nminright, minleftndx, buflen) : unorm
@@ -251,18 +223,18 @@ end
 
 function xcorr_basis(nu::Integer, nv::Integer)
     maxlag = max(nu, nv) - 1
-    -maxlag:maxlag
+    (-maxlag):maxlag
 end
 
 function xcorr_basis(nxcorr)
     maxlag = div(nxcorr, 2)
-    -maxlag:maxlag
+    (-maxlag):maxlag
 end
 
 function xcorr_valid_sig(
     xc::AbstractVector{<:Number},
     xc_nulls::AbstractVector{<:Number},
-    ntrial = length(null_xcs)
+    ntrial = length(xc_nulls),
 )
     xcmin, xcmax = extrema(xc)
     xc_extr = ifelse(abs(xcmin) > abs(xcmax), xcmin, xcmax)
@@ -275,7 +247,7 @@ function xcorr_valid_sig(
     chunks_v::AbstractVector{<:AbstractVector},
     xcs_null::AbstractVector{<:Number},
     n_trial = length(xcs_null);
-    kwargs...
+    kwargs...,
 )
     xc = xcorr_normed_valid(chunks_u, chunks_v, nlag; kwargs...)
     xcorr_valid_sig(xc, xcs_null, n_trial)
@@ -286,7 +258,7 @@ function xcorr_valid_sig(
     chunks_u::AbstractVector{<:AbstractVector},
     chunks_v::AbstractVector{<:AbstractVector},
     n_trial = 1000;
-    kwargs...
+    kwargs...,
 )
     xcs_null = xcorr_null_mc(chunks_u, chunks_v, nlag, n_trial; kwargs...)
     xcorr_valid_sig(nlag, chunks_u, chunks_v, xcs_null, n_trial; kwargs...)
@@ -299,7 +271,7 @@ function xcorr_null_mc(
     n_trial::Integer = 1000;
     norm::Bool = true,
     outtype::Type = Float32,
-    center::Bool = norm
+    center::Bool = norm,
 )
     normcheck(norm, center)
     extr_out = Vector{outtype}(undef, n_trial)
@@ -323,7 +295,8 @@ function xcorr_null_mc(
             ip,
             bufflen,
             nlag,
-            center
+            norm,
+            center,
         )
         xc_min, xc_max = extrema(out)
         extr_out[i] = ifelse(abs(xc_max) > abs(xc_min), xc_max, xc_min)

@@ -1,7 +1,5 @@
 # Assumes pts and basis are sorted
-function ifr!(
-    out::AbstractVector{<:Union{Missing, Number}}, pts, basis
-)
+function ifr!(out::AbstractVector{<:Union{Missing,Number}}, pts, basis)
     n_out = length(out)
     n_out == length(basis) || throw(ArgumentError("Basis not the same length"))
     last_pt = missing
@@ -20,27 +18,27 @@ function ifr!(
     if ismissing(last_pt)
         @inbounds out[:] .= missing
     else
-        @inbounds out[(last_i + 1):end] .= missing
+        @inbounds out[(last_i+1):end] .= missing
     end
     out
 end
 
-function ifr(pts, basis::Union{AbstractVector{T}, AbstractRange{T}}) where T
-    ifr!(Vector{Union{Missing, div_type(T)}}(undef, length(basis)), pts, basis)
+function ifr(pts, basis::Union{AbstractVector{T},AbstractRange{T}}) where {T}
+    ifr!(Vector{Union{Missing,div_type(T)}}(undef, length(basis)), pts, basis)
 end
 
 function ifr_upper!(basis, ifr_in)
     datapred = x -> ! ismissing(x)
     ib = findfirst(datapred, ifr_in)
     ie = findlast(datapred, ifr_in)
-    if ib == nothing || ie == nothing
+    if isnothing(ib) || isnothing(ie)
         ifr_in[:] .= 1 / (basis[end] - basis[1])
     end
-    if ib != nothing && ib > 1
-        ifr_in[1:(ib - 1)] .= 1 / (basis[ib - 1] - basis[1])
+    if !isnothing(ib) && ib > 1
+        ifr_in[1:(ib-1)] .= 1 / (basis[ib-1] - basis[1])
     end
-    if ie != nothing && ie < length(ifr_in)
-        ifr_in[(ie + 1):end] .= 1 / (basis[end] - basis[ie + 1])
+    if !isnothing(ie) && ie < length(ifr_in)
+        ifr_in[(ie+1):end] .= 1 / (basis[end] - basis[ie+1])
     end
     ifr_in
 end
