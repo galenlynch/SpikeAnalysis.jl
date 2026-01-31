@@ -72,7 +72,7 @@ function dft_point_mean_onesided(
 )
     basis = Vector{Float64}(undef, nfft)
     fft_out = Vector{Complex{Float64}}(undef, div(nfft, 2) + 1)
-    pl = pl == nothing ? plan_rfft(basis) : pl
+    pl = isnothing(pl) ? plan_rfft(basis) : pl
     norm2 = dft_point_mean_onesided!(basis, fft_out, npt, nsamp, winfun, pl)
     fft_out, norm2
 end
@@ -84,7 +84,7 @@ function point_psd(
     nfft = nothing,
 ) where {T<:Real}
     nsamp = ceil(Int, dur * fs)
-    if nfft == nothing
+    if isnothing(nfft)
         nfft = nextpow(2, nsamp)
     end
     fbasis = fs * 2 * pi * (0:1:div(nfft, 2)) / nfft
@@ -104,7 +104,7 @@ function point_psd(
     nfft = nothing,
 ) where {T}
     nsamps = ceil.(Int, durs * fs)
-    if nfft == nothing
+    if isnothing(nfft)
         nfft = nextpow(2, maximum(nsamps))
     end
     fbasis = fs * 2 * pi * (0:1:div(nfft, 2)) / nfft
@@ -141,7 +141,7 @@ function point_psd_bin(
     nfft = nothing,
 ) where {T}
     nsamps = ceil.(Int, durs * fs)
-    if nfft == nothing
+    if isnothing(nfft)
         nfft = nextpow(2, maximum(nsamps))
     end
     pds = zeros(T, div(nfft, 2) + 1)
@@ -150,7 +150,7 @@ function point_psd_bin(
         h = fit(Histogram, pt_sets[i], (0:(1/fs):durs[i]), closed = :left)
         pd = mt_pgram(h.weights .- mean(h.weights), fs = fs, nfft = nfft)
         pds .+= durs[i] * pd.power
-        f = f == nothing ? pd.freq : f
+        f = isnothing(f) ? pd.freq : f
     end
     pds ./= sum(durs)
     pds, f

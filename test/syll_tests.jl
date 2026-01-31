@@ -6,7 +6,7 @@ using Revise,
     OEUtilities,
     AcqGuiTools,
     GLFileCache,
-    GLUtilities,
+    SignalIndices,
     Destruct
 
 

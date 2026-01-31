@@ -234,7 +234,7 @@ end
 function xcorr_valid_sig(
     xc::AbstractVector{<:Number},
     xc_nulls::AbstractVector{<:Number},
-    ntrial = length(null_xcs),
+    ntrial = length(xc_nulls),
 )
     xcmin, xcmax = extrema(xc)
     xc_extr = ifelse(abs(xcmin) > abs(xcmax), xcmin, xcmax)
@@ -295,6 +295,7 @@ function xcorr_null_mc(
             ip,
             bufflen,
             nlag,
+            norm,
             center,
         )
         xc_min, xc_max = extrema(out)

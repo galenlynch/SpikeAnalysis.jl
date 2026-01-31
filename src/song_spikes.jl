@@ -79,12 +79,12 @@ function piecewise_pt_warp!(
     start = nothing,
     stop = nothing,
 )
-    isempty(anchors) && throw(ArugmentError("anchors cannot be empty"))
+    isempty(anchors) && throw(ArgumentError("anchors cannot be empty"))
     pts_empty = isempty(pts)
-    if start == nothing
+    if isnothing(start)
         start = pts_empty ? anchors[1] : min(pts[1], anchors[1])
     end
-    if stop == nothing
+    if isnothing(stop)
         stop = pts_empty ? anchors[end] : max(pts[end], anchors[end])
     end
     plan = piecewise_warp_plan(anchors, ref_anchors, start, stop)
@@ -152,7 +152,7 @@ function func_warp_remove!(
     ref_ifr_basis::Union{AbstractVector,AbstractRange},
     args...,
 )
-    interp = LinearInterpolation(ref_ifr_basis, ref_ifr)
+    interp = linear_interpolation(ref_ifr_basis, ref_ifr)
     func_warp_remove!(ifr_out, ifr_basis, interp, args...)
 end
 
@@ -178,7 +178,7 @@ function warp_ifr_section_remove!(
     i_b = searchsortedfirst(ifr_basis, warpsection.bounds[1])
     i_e = searchsortedlast(ifr_basis, warpsection.bounds[2])
     warped_basis = linear_pt_warp(ifr_basis[i_b:i_e], warpsection)
-    if warpsection.scaling == nothing
+    if isnothing(warpsection.scaling)
         ifr_out[i_b:i_e] .-= interp.(warped_basis)
     else
         ifr_out[i_b:i_e] .-= interp.(warped_basis) .* warpsection.scaling # Keep area the same
@@ -197,7 +197,7 @@ function func_remove_mean!(
     interval_post::Real = 0,
 )
     n_int = length(observed_intervals)
-    interp = LinearInterpolation(mean_basis, mean_ifr)
+    interp = linear_interpolation(mean_basis, mean_ifr)
     for i = 1:n_int
         func_warp_remove!(
             ifr_out,

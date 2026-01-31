@@ -37,14 +37,14 @@ function xcorr_discrete_normed(
     edgecorrect::Bool = true,
     closed = :left,
 )
-    if maxdiff != nothing && maxdiff < binsize
+    if !isnothing(maxdiff) && maxdiff < binsize
         error("maxdiff must be bigger than bins")
     end
     n_subsection = length(us)
     if length(vs) != n_subsection || length(durs) != n_subsection
         throw(ArgumentError("us, vs, and durs must have same length"))
     end
-    if maxdiff == nothing
+    if isnothing(maxdiff)
         bextent = maximum(durs)
     else
         bextent = maxdiff
@@ -75,7 +75,7 @@ function xcorr_discrete_normed(
         auto_v_sum +=
             corrected_auto_counts(vs[subno], binsize, durs[subno], edgecorrect, false)
     end
-    counts ./= (auto_y_sum * auto_v_sum) ^ (1 / 2)
+    counts ./= (auto_u_sum * auto_v_sum) ^ (1 / 2)
     counts, centers
 end
 
@@ -95,7 +95,7 @@ function acorr_discrete_normed(
     maxdiff = nothing,
     edgecorrect::Bool = true,
 )
-    if maxdiff != nothing && maxdiff < binsize
+    if !isnothing(maxdiff) && maxdiff < binsize
         error("maxdiff must be bigger than bins")
     end
     n_subsection = length(us)
@@ -103,13 +103,12 @@ function acorr_discrete_normed(
     if length(durs) != n_subsection
         throw(ArgumentError("us and durs must have same length"))
     end
-    if maxdiff == nothing
+    if isnothing(maxdiff)
         bextent = maximum(durs)
     else
         bextent = maxdiff
     end
     edges, centers = make_onesided_bins(bextent, binsize)
-    fitlermax = edges[end]
     n_bin = length(centers)
     counts = zeros(Float32, n_bin)
     for subno = 1:n_subsection
@@ -215,13 +214,13 @@ function empirical_qq(a::AbstractVector, b::AbstractVector)
     else
         # Make inverse empirical distribution
         if na > nb
-            interp_linear = LinearInterpolation((1:na) / na, a)
+            interp_linear = linear_interpolation((1:na) / na, a)
             outs = Vector{NTuple{2,Float64}}(undef, nb)
             for i = 1:nb
                 outs[i] = (interp_linear(i / nb), b[i])
             end
         else
-            interp_linear = LinearInterpolation((1:nb) / nb, b)
+            interp_linear = linear_interpolation((1:nb) / nb, b)
             outs = Vector{NTuple{2,Float64}}(undef, na)
             for i = 1:na
                 outs[i] = (a[i], interp_linear(i / na))
@@ -267,7 +266,7 @@ function acorr_discrete_validonly(
                 ntotal += 1
                 d = us[subno][j] - us[subno][i]
                 d >= maxdiff && break
-                @inbounds _glhist_push!(counts, d, 0, nbin, m)
+                @inbounds _uniformhist_push!(counts, d, nbin, m, 0)
                 auto_u_sum += d < binsize
             end
         end
@@ -333,7 +332,7 @@ function xcorr_discrete_validonly(
         diffs = imap_product(-, us[subno], view(vs[subno], ib:ie))
         ntotal += length(diffs)
 
-        glhist!(counts, diffs, edges)
+        uniformhist!(counts, diffs, edges)
 
         if normalize
             counts .-= expected_count(nu, nv, binsize, durs[subno])

@@ -9,7 +9,6 @@ using Revise,
     Dates,
     GLFileCache,
     Destruct,
-    GLUtilities,
     LIBSVM
 
 const conn_str = "postgresql://galen@localhost:5433/galen";

@@ -176,8 +176,8 @@ function trig_data(
     motif_i, motif_ons, motif_offs, motif_durs = find_motifs(trig_seq, syls)
 
     median_motif_dur = isempty(motif_durs) ? NaN : median(motif_durs)
-    if post == nothing
-        post_expand == nothing && error("post or post_expand must be specified")
+    if isnothing(post)
+        isnothing(post_expand) && error("post or post_expand must be specified")
         post = median_motif_dur + post_expand
     end
 
@@ -513,7 +513,7 @@ function guess_if_array_contains_song(
     kwargs...,
 )
     disc_proj = song_discriminant(l, sr, song_window = song_window, n = n, n_ov = n_ov)
-    guess_if_score_is_song(mean_i, rhythm_pow; kwargs...)
+    guess_if_score_is_song(disc_proj; kwargs...)
 end
 
 function guess_if_array_contains_song(

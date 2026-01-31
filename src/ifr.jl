@@ -31,13 +31,13 @@ function ifr_upper!(basis, ifr_in)
     datapred = x -> ! ismissing(x)
     ib = findfirst(datapred, ifr_in)
     ie = findlast(datapred, ifr_in)
-    if ib == nothing || ie == nothing
+    if isnothing(ib) || isnothing(ie)
         ifr_in[:] .= 1 / (basis[end] - basis[1])
     end
-    if ib != nothing && ib > 1
+    if !isnothing(ib) && ib > 1
         ifr_in[1:(ib-1)] .= 1 / (basis[ib-1] - basis[1])
     end
-    if ie != nothing && ie < length(ifr_in)
+    if !isnothing(ie) && ie < length(ifr_in)
         ifr_in[(ie+1):end] .= 1 / (basis[end] - basis[ie+1])
     end
     ifr_in
