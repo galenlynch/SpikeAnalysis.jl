@@ -1,5 +1,4 @@
-using
-    Revise,
+using Revise,
     LibPQ,
     DbCache,
     DataFrames,
@@ -7,7 +6,7 @@ using
     OEUtilities,
     AcqGuiTools,
     GLFileCache,
-    GLUtilities,
+    SignalIndices,
     Destruct
 
 
@@ -63,8 +62,8 @@ FROM derived_events de
 INNER JOIN event_fileinfo oe ON (oe.event_id = de.derived_event_id)
 INNER JOIN event_fileinfo ae ON (ae.event_id = de.original_event_id)
 """,
-        not_null = true
-    )
+        not_null = true,
+    ),
 )
 
 
@@ -103,14 +102,7 @@ oefs = find_db_file.(oe_dbfs)
 agfs = find_db_file.(ag_dbfs)
 
 oesylls, agsylls = destruct(
-    get_syllpairs.(
-        oefs,
-        agfs,
-        nt.oe_offset,
-        nt.oe_duration,
-        nt.ae_offset,
-        nt.ae_duration
-    )
+    get_syllpairs.(oefs, agfs, nt.oe_offset, nt.oe_duration, nt.ae_offset, nt.ae_duration),
 )
 fig, pyax = subplots(2, 1, sharex = true, sharey = true)
 ax = Axis{MPL}.(pyax)

@@ -2,28 +2,27 @@ module SpikeAnalysis
 
 import DSP.Periodograms.fft2pow!
 
-using
-    StatsBase,
-    GLUtilities,
-    Destruct,
-    FFTW,
-    DSP,
-    LinearAlgebra,
-    Statistics,
-    PointProcesses,
-    Distributed,
-    SharedArrays,
-    TSConditioning
+using DSP: DSP, Periodograms, blackman, filtfilt, mt_pgram, nextfastfft, spectrogram
+using Destruct: Destruct, destruct
+using Distributed: Distributed
+using FFTW: FFTW, plan_irfft, plan_rfft
+using SignalIndices: allsame, clip_ndx, clipsize!, div_type, find_subseq, imap_product,
+    map_pairwise, moving_sum, n_ndx, ndx_offset, t_to_ndx, uniformhist!,
+    _uniformhist_push!
+using SortedIntervals: clip_int, intervals_are_ordered
+using LinearAlgebra: LinearAlgebra, mul!
+using EventIntervals: EventIntervals, NakedPoint, get_mark, measure,
+    bounds, NakedInterval, MarkedInterval, RelativeInterval, IntervalSet, Points,
+    NakedPoints, complement, shrink, mask_events, nakedvalues
+using SharedArrays: SharedArrays
+using Statistics: Statistics, mean, median, quantile
+using StatsBase: StatsBase, Histogram, fit
+using TSConditioning: TSConditioning, make_bandpass
 
-using Interpolations: LinearInterpolation, AbstractInterpolation
-using PointProcesses: bounds, NakedInterval, MarkedInterval, RelativeInterval,
-    IntervalSet, Points, NakedPoints, complement, shrink, mask_events,
-    nakedvalues
+using Interpolations: linear_interpolation, AbstractInterpolation
 
-using GLUtilities: _glhist_push!
 
-export
-    xcorr_discrete_normed,
+export xcorr_discrete_normed,
     acorr_discrete_normed,
     xcorr_discrete_validonly,
     acorr_discrete_validonly,

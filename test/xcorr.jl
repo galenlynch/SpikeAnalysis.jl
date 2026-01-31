@@ -1,31 +1,14 @@
-using
-    Revise,
-    LibPQ,
-    PyCall,
-    SpikeAnalysis,
-    PyPlot,
-    Seaborn,
-    Statistics,
-    OEDiscovery,
-    Destruct
+using Revise,
+    LibPQ, PyCall, SpikeAnalysis, PyPlot, Seaborn, Statistics, OEDiscovery, Destruct
 
 
-const conn_str =  "postgresql://galen@localhost:5433/galen"
+const conn_str = "postgresql://galen@localhost:5433/galen"
 const conn = LibPQ.Connection(conn_str)
 
 const song_rid = 192243
 
-(
-    recording_ids,
-    chnos,
-    spk_type,
-    labels_spk,
-    durs_recs,
-    spks,
-    x_ch,
-    y_ch,
-    z_ch
-) = get_spikes(conn, song_rid)
+(recording_ids, chnos, spk_type, labels_spk, durs_recs, spks, x_ch, y_ch, z_ch) =
+    get_spikes(conn, song_rid)
 
 spk_idx = 1
 
