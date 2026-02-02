@@ -8,7 +8,7 @@ using Compat,
     TSConditioning,
     DSP,
     OpenEphysLoader,
-    SignalPlots,
+    NeuroPlots,
     OEPlotting,
     DynamicTimeseries,
     PyQtGraph,
@@ -392,7 +392,7 @@ overlay_ax[:set_ylabel]("Std. from baseline")
 overlay_ax[:set_title]("Waveforms")
 
 c_this_elec = PyPlot.matplotlib[:patches][:Circle](
-    (x_ch[spk_idx], y_ch[spk_idx]), SignalPlots.PI_PITCH / 2,
+    (x_ch[spk_idx], y_ch[spk_idx]), NeuroPlots.PI_PITCH / 2,
     edgecolor = "none"
 )
 pos_ax[:add_patch](c_this_elec)
