@@ -53,11 +53,28 @@ function xcorr_discrete_normed(
     counts = zeros(Float32, 2 * n_sidebins + 1)
     auto_u_sum = zero(Float32)
     auto_v_sum = zero(Float32)
+    use_bounded = !isnothing(maxdiff) && closed == :left
+    m = 1 / binsize
+    firstedge = first(edges)
     for subno = 1:n_subsection
-        diffs = map_pairwise(-, us[subno], vs[subno])
-        flatdiffs = reshape(diffs, length(diffs))
-        h = fit(Histogram, flatdiffs, edges, closed = closed)
-        counts .+= h.weights
+        if use_bounded
+            symmetric_hist_windowed!(
+                counts,
+                us[subno],
+                vs[subno],
+                maxdiff,
+                length(counts),
+                m,
+                firstedge,
+                firstindex(vs[subno]),
+                lastindex(vs[subno]),
+            )
+        else
+            diffs = map_pairwise(-, us[subno], vs[subno])
+            flatdiffs = reshape(diffs, length(diffs))
+            h = fit(Histogram, flatdiffs, edges, closed = closed)
+            counts .+= h.weights
+        end
         if edgecorrect
             center_cnts_symm!(
                 counts,
@@ -75,8 +92,69 @@ function xcorr_discrete_normed(
         auto_v_sum +=
             corrected_auto_counts(vs[subno], binsize, durs[subno], edgecorrect, false)
     end
-    counts ./= (auto_u_sum * auto_v_sum) ^ (1 / 2)
+    counts ./= sqrt(auto_u_sum * auto_v_sum)
     counts, centers
+end
+
+function symmetric_hist_windowed!(
+    counts::AbstractVector,
+    u::AbstractVector{<:Number},
+    v::AbstractVector{<:Number},
+    maxdiff::Number,
+    nbin::Integer,
+    m::Number,
+    firstedge::Number,
+    lo::Integer,
+    vlast::Integer,
+)
+    hi = lo - 1
+    lo > vlast && return 0
+    ntotal = 0
+    @inbounds for ui in u
+        left = ui - maxdiff
+        right = ui + maxdiff
+        while lo <= vlast && v[lo] < left
+            lo += 1
+        end
+        hi = max(hi, lo - 1)
+        while hi < vlast && v[hi+1] <= right
+            hi += 1
+        end
+        lo > hi && continue
+        for j = lo:hi
+            d = ui - v[j]
+            idx = floor(Int, (d - firstedge) * m) + 1
+            1 <= idx <= nbin || continue
+            counts[idx] += 1
+            ntotal += 1
+        end
+    end
+    ntotal
+end
+
+function forward_hist_windowed!(
+    counts::AbstractVector,
+    u::AbstractVector{<:Number},
+    maxdiff::Number,
+    nbin::Integer,
+    m::Number,
+    istop::Integer,
+)
+    ntotal = 0
+    firstbinpairs = 0
+    @inbounds for i = 1:istop
+        j = i + 1
+        while j <= length(u) && u[j] < u[i] + maxdiff
+            d = u[j] - u[i]
+            idx = floor(Int, d * m) + 1
+            1 <= idx <= nbin || break
+            counts[idx] += 1
+            ntotal += 1
+            firstbinpairs += idx == 1
+            j += 1
+        end
+    end
+    ntotal, firstbinpairs
 end
 
 function xcorr_discrete_normed(
@@ -99,7 +177,6 @@ function acorr_discrete_normed(
         error("maxdiff must be bigger than bins")
     end
     n_subsection = length(us)
-    nus = length.(us)
     if length(durs) != n_subsection
         throw(ArgumentError("us and durs must have same length"))
     end
@@ -111,10 +188,16 @@ function acorr_discrete_normed(
     edges, centers = make_onesided_bins(bextent, binsize)
     n_bin = length(centers)
     counts = zeros(Float32, n_bin)
+    use_bounded = !isnothing(maxdiff)
+    m = 1 / binsize
     for subno = 1:n_subsection
-        diffs = map_pairwise(-, us[subno])
-        h = fit(Histogram, diffs, edges, closed = :left)
-        counts .+= h.weights
+        if use_bounded
+            forward_hist_windowed!(counts, us[subno], maxdiff, n_bin, m, length(us[subno]))
+        else
+            diffs = map_pairwise(-, us[subno])
+            h = fit(Histogram, diffs, edges, closed = :left)
+            counts .+= h.weights
+        end
         if edgecorrect
             center_cnts_onesided!(counts, length(us[subno]), binsize, durs[subno], n_bin)
         else
@@ -132,7 +215,17 @@ function acorr_discrete_normed(u::AbstractVector{<:Number}, dur::Number; kwargs.
 end
 
 function count_auto_first(u, halfbin)
-    length(u) + count(x -> x < halfbin, map_pairwise(-, u))
+    nu = length(u)
+    cnt = nu
+    j = 2
+    @inbounds for i = 1:nu
+        j = max(j, i + 1)
+        while j <= nu && u[j] < u[i] + halfbin
+            j += 1
+        end
+        cnt += j - (i + 1)
+    end
+    cnt
 end
 
 function corrected_auto_counts(u, binsize, dur, edgecorrect::Bool = true, auto::Bool = true)
@@ -259,17 +352,17 @@ function acorr_discrete_validonly(
     for subno = 1:n_subsection
         ie = searchsortedlast(us[subno], bounds[subno][2] - maxdiff)
         ie == 0 && continue
-        auto_u_sum += ie
         l = length(us[subno])
-        for i = 1:ie
-            for j = (i+1):l
-                ntotal += 1
-                d = us[subno][j] - us[subno][i]
-                d >= maxdiff && break
-                @inbounds _uniformhist_push!(counts, d, nbin, m, 0)
-                auto_u_sum += d < binsize
-            end
-        end
+        _, firstbinpairs = forward_hist_windowed!(
+            counts,
+            us[subno],
+            maxdiff,
+            nbin,
+            m,
+            ie,
+        )
+        ntotal += ie * l - ie * (ie + 1) ÷ 2
+        auto_u_sum += ie + firstbinpairs
 
         if normalize
             ec = expected_count(l, ie, binsize, durs[subno])
@@ -322,17 +415,26 @@ function xcorr_discrete_validonly(
     auto_u_sum = zero(Float32)
     auto_v_sum = zero(Float32)
     ntotal = 0
+    m = 1 / binsize
+    firstedge = first(edges)
 
     for subno = 1:n_subsection
         nu = length(us[subno])
         nv = length(vs[subno])
         ib = searchsortedfirst(vs[subno], bounds[subno][1] + maxdiff)
         ie = searchsortedlast(vs[subno], bounds[subno][2] - maxdiff)
-        ie < ib && continue
-        diffs = imap_product(-, us[subno], view(vs[subno], ib:ie))
-        ntotal += length(diffs)
-
-        uniformhist!(counts, diffs, edges)
+        symmetric_hist_windowed!(
+            counts,
+            us[subno],
+            vs[subno],
+            maxdiff,
+            length(counts),
+            m,
+            firstedge,
+            ib,
+            ie,
+        )
+        ntotal += nu * max(0, ie - ib + 1)
 
         if normalize
             counts .-= expected_count(nu, nv, binsize, durs[subno])

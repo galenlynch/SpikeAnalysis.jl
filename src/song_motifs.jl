@@ -312,7 +312,7 @@ Requires input to be sorted and not overlapping.
 
 Returns a tuple where the first elements, `expanded`, is an array of interval
 sets with the original syllable joined with the "pre" period. The second element,
-`points`, is an array of [`NakedPoints`](@ref) with points for syllable onset
+`points`, is an array of `NakedPoints` with points for syllable onset
 and offset defined on an expanded interval, including the "pre" period.
 """
 function add_pres(

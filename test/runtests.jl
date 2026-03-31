@@ -1,5 +1,4 @@
 using SpikeAnalysis
 using Test
 
-# write your own tests here
-#@test 1 == 2
+include("sp_corrs_bounded.jl")
