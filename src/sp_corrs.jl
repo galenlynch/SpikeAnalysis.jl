@@ -50,7 +50,8 @@ function xcorr_discrete_normed(
         bextent = maxdiff
     end
     edges, centers, n_sidebins = make_sym_bins(bextent, binsize)
-    counts = zeros(Float32, 2 * n_sidebins + 1)
+    nbin = 2 * n_sidebins + 1
+    counts = zeros(Float32, nbin)
     auto_u_sum = zero(Float32)
     auto_v_sum = zero(Float32)
     use_bounded = !isnothing(maxdiff) && closed == :left
@@ -63,7 +64,7 @@ function xcorr_discrete_normed(
                 us[subno],
                 vs[subno],
                 maxdiff,
-                length(counts),
+                nbin,
                 m,
                 firstedge,
                 firstindex(vs[subno]),
@@ -140,21 +141,22 @@ function forward_hist_windowed!(
     m::Number,
     istop::Integer,
 )
-    ntotal = 0
     firstbinpairs = 0
+    nu = length(u)
     @inbounds for i = 1:istop
+        ui = u[i]
+        right = ui + maxdiff
         j = i + 1
-        while j <= length(u) && u[j] < u[i] + maxdiff
-            d = u[j] - u[i]
+        while j <= nu && u[j] < right
+            d = u[j] - ui
             idx = floor(Int, d * m) + 1
             1 <= idx <= nbin || break
             counts[idx] += 1
-            ntotal += 1
             firstbinpairs += idx == 1
             j += 1
         end
     end
-    ntotal, firstbinpairs
+    firstbinpairs
 end
 
 function xcorr_discrete_normed(
@@ -353,7 +355,7 @@ function acorr_discrete_validonly(
         ie = searchsortedlast(us[subno], bounds[subno][2] - maxdiff)
         ie == 0 && continue
         l = length(us[subno])
-        _, firstbinpairs = forward_hist_windowed!(
+        firstbinpairs = forward_hist_windowed!(
             counts,
             us[subno],
             maxdiff,
@@ -411,7 +413,8 @@ function xcorr_discrete_validonly(
         error("2 * maxdiff must be smaller than all durs")
     end
     edges, centers, n_sidebins = make_sym_bins(maxdiff, binsize)
-    counts = zeros(Float32, 2 * n_sidebins + 1)
+    nbin = 2 * n_sidebins + 1
+    counts = zeros(Float32, nbin)
     auto_u_sum = zero(Float32)
     auto_v_sum = zero(Float32)
     ntotal = 0
@@ -428,7 +431,7 @@ function xcorr_discrete_validonly(
             us[subno],
             vs[subno],
             maxdiff,
-            length(counts),
+            nbin,
             m,
             firstedge,
             ib,
