@@ -111,9 +111,10 @@ function symmetric_hist_windowed!(
     hi = lo - 1
     lo > vlast && return 0
     ntotal = 0
+    halfbin = 1 / (2 * m)  # binsize / 2
     @inbounds for ui in u
-        left = ui - maxdiff
-        right = ui + maxdiff
+        left = ui - maxdiff - halfbin
+        right = ui + maxdiff + halfbin
         while lo <= vlast && v[lo] < left
             lo += 1
         end
