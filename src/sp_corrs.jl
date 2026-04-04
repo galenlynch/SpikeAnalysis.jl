@@ -3,11 +3,71 @@
 """
     xcorr_discrete_normed(us, vs, durs; binsize=0.005, maxdiff=nothing, edgecorrect=true, closed=:left)
 
-Calculate the normalized cross-correlation of two sets of discrete time points.
+Edge-corrected correlation coefficient cross-correlogram for discrete point
+processes observed over multiple subsections (e.g. trials).
+
+# Normalization derivation
+
+The goal is a unitless measure in ``[-1, 1]`` that is zero when the two
+processes are independent and conditionally uniform within each subsection.
+
+**Step 1 — raw histogram.**  For each subsection ``s`` with spike trains
+``u_s``, ``v_s`` of lengths ``n_u``, ``n_v`` and duration ``d``, accumulate
+all pairwise time differences ``v_j - u_i`` into lag bins.  The raw count in
+bin ``b`` across all subsections is ``h[b] = \\sum_s h_s[b]``.
+
+**Step 2 — expected count under independence (edge-corrected).**  If spikes
+are uniformly distributed within a subsection of duration ``d``, the
+probability that a ``(u, v)`` pair falls in a lag bin of width ``w`` whose
+far edge is at distance ``binstop`` from zero lag is:
+
+```
+P(bin b) = w * (d - binstop + w/2) / d^2
+```
+
+The ``(d - binstop + w/2)`` term is the range of reference-spike positions
+for which the target spike can land in bin ``b`` without exceeding the
+observation window (triangle / edge correction).  For the centre bin
+(lag ≈ 0), coincidences arrive from both the positive and negative side,
+so the expected count is multiplied by 2 (``center_scale``).
+
+The total expected count is:
+
+```
+E[b] = \\sum_s  scale[b] * w[b] * (d_s - binstop[b] + w[b]/2) / d_s^2  *  n_{u,s} * n_{v,s}
+```
+
+This respects per-subsection rate variation: subsections where both neurons
+fire more contribute proportionally more expected coincidences.
+
+**Step 3 — centred histogram.**  Subtract the expected counts:
+``c[b] = h[b] - E[b]``.  Under the null (independent, uniform within each
+subsection), ``E[c[b]] = 0``.
+
+**Step 4 — denominator (geometric mean of auto terms).**  To normalize to a
+correlation coefficient, divide by ``\\sqrt{A_u \\cdot A_v}`` where each
+auto term is:
+
+```
+A_u = \\sum_s  [ count\\_auto\\_first(u_s, binsize) - 2 * E_{auto}(s) ]
+```
+
+``count_auto_first`` counts spike pairs in ``u_s`` within ``binsize`` of
+each other (including self-pairs).  ``E_{auto}`` is the expected auto count
+under the same edge-corrected uniform model.  The factor 2 (rather than 1)
+accounts for the cross-correlation context: the auto term must match the
+variance of the cross-histogram, which sums contributions from both
+positive and negative lags of the implicit auto-correlogram at lag 0.
+
+The final normalized correlogram is:
+
+```
+C[b] = (h[b] - E[b]) / sqrt(A_u * A_v)
+```
 
 # Parameters
 - `us::AbstractVector{<:AbstractVector{<:Number}}`: A collection of sets of
-  discrete time points.
+  discrete time points (one per subsection / trial).
 - `vs::AbstractVector{<:AbstractVector{<:Number}}`: A collection of sets of
   discrete time points corresponding to `us`.
 - `durs::AbstractVector{<:Number}`: Duration of each subsection. Must have the
@@ -274,6 +334,16 @@ function center_cnts_onesided!(cnts, nu, binsize, dur, n_sidebins)
     nothing
 end
 
+"""
+    expected_count_edge_corrected(binstop, nu, nv, binsize, dur)
+
+Expected coincidence count in a lag bin under independence with edge
+correction.  `binstop` is the distance from lag 0 to the far edge of the
+bin.  The numerator `binsize * (dur - binstop + binsize/2)` is the area of
+the triangle of valid reference positions × bin width; dividing by `dur^2`
+gives the probability that a random `(u, v)` pair lands in this bin.
+Multiplying by `nu * nv` gives the expected count.
+"""
 function expected_count_edge_corrected(binstop, nu, nv, binsize, dur)
     (nu * nv * binsize * (dur - binstop + binsize / 2)) / dur^2
 end
