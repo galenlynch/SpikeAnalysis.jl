@@ -28,8 +28,21 @@ from `corrcoef` to `legacy_auto_normalized`.
 
 **Step 1 — raw histogram.**  For each subsection ``s`` with spike trains
 ``u_s``, ``v_s`` of lengths ``n_u``, ``n_v`` and duration ``d``, accumulate
-all pairwise time differences ``v_j - u_i`` into lag bins.  The raw count in
+all pairwise time differences ``u_i - v_j`` into lag bins.  The raw count in
 bin ``b`` across all subsections is ``h[b] = \\sum_s h_s[b]``.
+
+!!! warning "Lag sign, and the Python port"
+    The difference taken is `u_i - v_j`, so a **positive** lag means a `vs`
+    spike came first — `vs` leads `us`. Earlier revisions of this docstring
+    said `v_j - u_i`, which is the opposite and does not match the code (see
+    `map_pairwise(-, us[subno], vs[subno])` below).
+
+    `aind_ephys_utils.metrics.ccg` uses the opposite convention: its
+    `C[i, j]` histograms `t_j - t_i`, so there a positive lag means unit `i`
+    leads. The two agree to `eps(Float32)` once one is reversed — verified
+    on independent, coupled and identical trains — but a directional
+    conclusion does **not** transfer between them unaltered. Reverse the lag
+    axis when cross-validating.
 
 **Step 2 — expected count under independence (edge-corrected).**  If spikes
 are uniformly distributed within a subsection of duration ``d``, the
