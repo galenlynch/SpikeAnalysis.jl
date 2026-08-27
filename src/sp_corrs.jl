@@ -8,8 +8,23 @@ processes observed over multiple subsections (e.g. trials).
 
 # Normalization derivation
 
-The goal is a unitless measure in ``[-1, 1]`` that is zero when the two
-processes are independent and conditionally uniform within each subsection.
+The goal is a unitless measure that is zero when the two processes are
+independent and conditionally uniform within each subsection.
+
+It is **not** bounded to ``[-1, 1]``.  The estimand is a density, so the
+bound is a category error; the value is a shape statistic rather than a
+correlation coefficient, and this is why the Python port renamed the mode
+from `corrcoef` to `legacy_auto_normalized`.
+
+!!! warning "One duration per subsection, for both trains"
+    `durs[s]` is used as the observation window for `us[s]` *and* `vs[s]`,
+    and there is no overlap machinery here.  A caller that permutes `vs`
+    relative to `us` -- a shift predictor or a trial-shuffle surrogate --
+    must therefore ensure the permuted subsections share support with the
+    ones they are paired against.  With heterogeneous durations a permuted
+    `vs` is silently normalized against the wrong window.  Clip to a common
+    window first, or restrict the permutation to subsections of matching
+    support.
 
 **Step 1 — raw histogram.**  For each subsection ``s`` with spike trains
 ``u_s``, ``v_s`` of lengths ``n_u``, ``n_v`` and duration ``d``, accumulate
@@ -291,16 +306,46 @@ function count_auto_first(u, halfbin)
     cnt
 end
 
+"""
+    corrected_auto_counts(u, binsize, dur, edgecorrect=true, auto=true)
+
+Auto-correlation normalization term for one spike train.
+
+With `auto=true` this is the autocorrelogram's own one-sided count over a
+full `binsize`, minus its expected count.
+
+With `auto=false` the term normalizes a *cross*-histogram's centre bin,
+which spans `|lag| < binsize/2` and so collects both lag signs. The term
+must be that same quantity for the train against itself:
+`2 * count_auto_first(u, binsize/2) - nu` is exactly that bin's raw count,
+since `count_auto_first` already includes the `nu` self-pairs, so doubling
+for the two signs and removing one copy leaves them counted once. The
+expectation subtracted is then the centre bin's own — the same
+`2 * expected_count_edge_corrected(halfbin, nu, nu, halfbin, dur)` that
+`center_cnts_symm!` removes from that bin.
+
+Previously this branch took the one-sided full-width count and doubled the
+*expectation* instead, which is a different correction: two units with
+identical spike trains gave a zero-lag value of 1.016 to 1.107 rather than 1.
+"""
 function corrected_auto_counts(u, binsize, dur, edgecorrect::Bool = true, auto::Bool = true)
+    nu = length(u)
+    if !auto
+        halfbin = binsize / 2
+        basecount = 2 * count_auto_first(u, halfbin) - nu
+        if edgecorrect
+            return basecount -
+                   2 * expected_count_edge_corrected(halfbin, nu, nu, halfbin, dur)
+        end
+        # The centre bin is `binsize` wide in total, so no doubling.
+        return basecount - expected_count(nu, nu, binsize, dur)
+    end
     basecount = count_auto_first(u, binsize)
-    count_coeff = ifelse(auto, 1, 2)
     if edgecorrect
-        nu = length(u)
         corrected_cnt =
-            basecount -
-            count_coeff * expected_count_edge_corrected(binsize, nu, binsize, dur)
+            basecount - expected_count_edge_corrected(binsize, nu, binsize, dur)
     else
-        corrected_cnt = basecount - count_coeff * expected_count(u, binsize, dur)
+        corrected_cnt = basecount - expected_count(u, binsize, dur)
     end
     corrected_cnt
 end

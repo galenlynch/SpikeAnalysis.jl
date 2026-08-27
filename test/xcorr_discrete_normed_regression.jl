@@ -1,4 +1,4 @@
-using Random: MersenneTwister
+using Random: MersenneTwister, randexp
 using Statistics: mean, std
 
 """Generate a homogeneous Poisson spike train via exponential ISIs."""
@@ -127,4 +127,45 @@ end
     # Peak should stand clearly above baseline
     baseline = mean(counts[abs.(centers) .> 0.020])
     @test counts[peak_idx] > baseline + 3 * std(counts[abs.(centers) .> 0.020])
+end
+
+
+@testset "xcorr_discrete_normed identical trains give unit zero lag" begin
+    # Self-consistency for the normalized statistic: a unit correlated with
+    # its own copy must give exactly 1 at zero lag.  The auto term is the
+    # autocorrelogram's own two-sided centre bin, the same quantity the
+    # numerator's centre bin is; the earlier one-sided count against a
+    # doubled expectation put this between 1.016 and 1.107.
+    #
+    # Parameterized over train statistics because the candidate corrections
+    # disagree in different regimes.
+    for kind in (:poisson, :regular, :bursty, :refractory)
+        for binsize in (0.0005, 0.002)
+            rng = MersenneTwister(5)
+            per = Vector{Vector{Float64}}()
+            for _ = 1:6
+                if kind === :poisson
+                    t = sort(rand(rng, 40))
+                elseif kind === :regular
+                    t = collect(range(0.01, 0.99, length = 40))
+                elseif kind === :bursty
+                    seeds = sort(rand(rng, 8) .* 0.9)
+                    t = sort(vcat([s .+ randexp(rng, 5) .* 0.004 for s in seeds]...))
+                    t = t[t .< 1.0]
+                else
+                    t = sort(rand(rng, 60))
+                    t = t[[true; diff(t) .> 0.005]]
+                end
+                push!(per, t)
+            end
+            counts, centers = xcorr_discrete_normed(
+                per, per, fill(1.0, length(per));
+                binsize = binsize, maxdiff = 0.02, edgecorrect = true,
+            )
+            mid = cld(length(counts), 2)
+            @test centers[mid] ≈ 0 atol = 1e-12
+            # Float32 accumulation, so eps(Float32) is the achievable floor.
+            @test counts[mid] ≈ 1 atol = 1e-6
+        end
+    end
 end
