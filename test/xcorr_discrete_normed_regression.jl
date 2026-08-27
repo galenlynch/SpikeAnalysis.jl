@@ -122,7 +122,9 @@ end
 
     peak_idx = argmax(counts)
     peak_lag = centers[peak_idx]
-    @test peak_lag ≈ -delay atol = binsize
+    # B lags A by `delay`, and `us` is the reference, so the peak sits at
+    # +delay.  This asserted -delay while the implementation took u - v.
+    @test peak_lag ≈ delay atol = binsize
 
     # Peak should stand clearly above baseline
     baseline = mean(counts[abs.(centers) .> 0.020])

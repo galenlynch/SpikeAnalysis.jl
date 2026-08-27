@@ -31,18 +31,19 @@ from `corrcoef` to `legacy_auto_normalized`.
 all pairwise time differences ``u_i - v_j`` into lag bins.  The raw count in
 bin ``b`` across all subsections is ``h[b] = \\sum_s h_s[b]``.
 
-!!! warning "Lag sign, and the Python port"
-    The difference taken is `u_i - v_j`, so a **positive** lag means a `vs`
-    spike came first — `vs` leads `us`. Earlier revisions of this docstring
-    said `v_j - u_i`, which is the opposite and does not match the code (see
-    `map_pairwise(-, us[subno], vs[subno])` below).
+!!! note "Lag sign"
+    `us` is the reference train and `vs` the target, so a **positive** lag
+    means a `vs` spike came *after* its `us` partner: `us` leads. A
+    monosynaptic `us -> vs` connection shows a peak a few milliseconds to
+    the right of zero.
 
-    `aind_ephys_utils.metrics.ccg` uses the opposite convention: its
-    `C[i, j]` histograms `t_j - t_i`, so there a positive lag means unit `i`
-    leads. The two agree to `eps(Float32)` once one is reversed — verified
-    on independent, coupled and identical trains — but a directional
-    conclusion does **not** transfer between them unaltered. Reverse the lag
-    axis when cross-validating.
+    This matches `aind_ephys_utils.metrics.ccg`, whose `C[i, j]` histograms
+    `t_j - t_i`. The two agree to `eps(Float32)` on independent, coupled and
+    identical trains.
+
+    Until 2026 the implementation took `u_i - v_j`, giving the opposite
+    sign, while this docstring described `v_j - u_i`. Any signed-lag result
+    produced by an earlier revision is reversed relative to this one.
 
 **Step 2 — expected count under independence (edge-corrected).**  If spikes
 are uniformly distributed within a subsection of duration ``d``, the
@@ -157,9 +158,10 @@ function xcorr_discrete_normed(
                 firstedge,
                 firstindex(vs[subno]),
                 lastindex(vs[subno]),
+                edges,
             )
         else
-            diffs = map_pairwise(-, us[subno], vs[subno])
+            diffs = map_pairwise(-, vs[subno], us[subno])
             flatdiffs = reshape(diffs, length(diffs))
             h = fit(Histogram, flatdiffs, edges, closed = closed)
             counts .+= h.weights
@@ -185,6 +187,29 @@ function xcorr_discrete_normed(
     counts, centers
 end
 
+"""
+    lag_bin(d, firstedge, m, edges, nbin)
+
+Left-closed bin index for lag `d`, i.e. the largest `i` with `edges[i] <= d`.
+
+`floor((d - firstedge) * m)` alone is not enough: for a `d` sitting just
+*below* an edge the subtract-then-multiply can round up onto the integer and
+place it one bin too high. (Just *above* an edge it is fine, which is why
+this only became visible once the lag sign was flipped.) The floor gives the
+candidate in O(1); one comparison against the exact edge corrects it.
+"""
+@inline function lag_bin(d, firstedge, m, edges, nbin)
+    idx = floor(Int, (d - firstedge) * m) + 1
+    idx < 1 && return 0
+    idx > nbin && return nbin + 1
+    @inbounds if d < edges[idx]
+        idx -= 1
+    elseif idx < nbin && d >= edges[idx+1]
+        idx += 1
+    end
+    idx
+end
+
 function symmetric_hist_windowed!(
     counts::AbstractVector,
     u::AbstractVector{<:Number},
@@ -195,6 +220,7 @@ function symmetric_hist_windowed!(
     firstedge::Number,
     lo::Integer,
     vlast::Integer,
+    edges = nothing,
 )
     hi = lo - 1
     lo > vlast && return 0
@@ -212,8 +238,12 @@ function symmetric_hist_windowed!(
         end
         lo > hi && continue
         for j = lo:hi
-            d = ui - v[j]
-            idx = floor(Int, (d - firstedge) * m) + 1
+            d = v[j] - ui
+            idx = if edges === nothing
+                floor(Int, (d - firstedge) * m) + 1
+            else
+                lag_bin(d, firstedge, m, edges, nbin)
+            end
             1 <= idx <= nbin || continue
             counts[idx] += 1
             ntotal += 1
@@ -565,6 +595,7 @@ function xcorr_discrete_validonly(
             firstedge,
             ib,
             ie,
+            edges,
         )
         ntotal += nu * max(0, ie - ib + 1)
 

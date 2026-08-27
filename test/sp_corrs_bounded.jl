@@ -15,7 +15,9 @@ function xcorr_discrete_normed_reference(
     auto_u_sum = zero(Float32)
     auto_v_sum = zero(Float32)
     for subno = 1:length(us)
-        diffs = vec([u - v for u in us[subno], v in vs[subno]])
+        # `us` is the reference: positive lag means the `vs` spike came
+        # after, matching xcorr_discrete_normed.
+        diffs = vec([v - u for u in us[subno], v in vs[subno]])
         h = fit(Histogram, diffs, edges, closed = closed)
         counts .+= h.weights
         if edgecorrect
@@ -105,7 +107,9 @@ function xcorr_discrete_validonly_reference(
         ib = searchsortedfirst(vs[subno], bounds[subno][1] + maxdiff)
         ie = searchsortedlast(vs[subno], bounds[subno][2] - maxdiff)
         ie < ib && continue
-        diffs = [u - v for u in us[subno] for v in view(vs[subno], ib:ie)]
+        # `us` is the reference: positive lag means the `vs` spike came
+        # after, matching xcorr_discrete_validonly.
+        diffs = [v - u for u in us[subno] for v in view(vs[subno], ib:ie)]
         ntotal += length(us[subno]) * (ie - ib + 1)
         h = fit(Histogram, diffs, edges, closed = :left)
         counts .+= h.weights
